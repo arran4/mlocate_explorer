@@ -4,7 +4,14 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_treeview/flutter_treeview.dart';
+
+class Node {
+  final String key;
+  final String label;
+  final List<Node> children;
+
+  Node({required this.key, required this.label, this.children = const []});
+}
 
 void main() {
   runApp(const MyApp());
@@ -60,36 +67,14 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                 onPressed: _pickFile,
                 child: const Text('Pick mlocate.db File'),
               )
-            : TreeView(
-                controller: TreeViewController(
-                  children: [rootNode!],
-                  selectedKey: rootNode!.key,
-                ),
-                shrinkWrap: true,
-                theme: TreeViewTheme(
-                  expanderTheme: const ExpanderThemeData(
-                    type: ExpanderType.caret,
-                    modifier: ExpanderModifier.none,
-                    position: ExpanderPosition.start,
-                    color: Colors.blue,
-                    size: 20,
-                  ),
-                  labelStyle: const TextStyle(
-                    fontSize: 16,
-                    letterSpacing: 0.3,
-                  ),
-                  parentLabelStyle: TextStyle(
-                    fontSize: 16,
-                    letterSpacing: 0.3,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.blue.shade700,
-                  ),
-                  iconTheme: IconThemeData(
-                    size: 18,
-                    color: Colors.grey.shade800,
-                  ),
-                  colorScheme: Theme.of(context).colorScheme,
-                ),
+            : ListView.builder(
+                itemCount: rootNode!.children.length,
+                itemBuilder: (context, index) {
+                  final node = rootNode!.children[index];
+                  return ListTile(
+                    title: Text(node.label),
+                  );
+                },
               ),
       ),
     );
@@ -143,10 +128,25 @@ class MlocateDBParser {
     await file.readByte(); // requireVisibilityFlag
     await file.read(2); // padding
 
-    await _parseConfigurationBlock(configBlockSize);
-
+    // DEBUG:
     var rootPath = await _readNullTerminatedString();
     rootNode = Node(key: rootPath, label: rootPath, children: []);
+
+    await _parseConfigurationBlock(configBlockSize);
+  }
+
+  // Helper to find a node by its full path from the root
+  Node? _findNodeByPath(String path) {
+    if (rootNode == null) return null;
+    if (rootNode!.key == path || path == '/') return rootNode;
+
+    // A simple linear search for now, assuming the directories
+    // were added to rootNode's children (or we can flatten the structure).
+    // The previous implementation added flat directories directly to rootNode!.children
+    for (var node in rootNode!.children) {
+      if (node.key == path) return node;
+    }
+    return null;
   }
 
   Future<void> _parseConfigurationBlock(int configBlockSize) async {
@@ -170,35 +170,49 @@ class MlocateDBParser {
   Future<void> _parseDirectories() async {
     while (true) {
       try {
-        await file.read(8); // dirTimeSecBytes
-        await file.read(4); // dirTimeNanoBytes
+        var secBytes = await file.read(8); // dirTimeSecBytes
+        if (secBytes.length < 8) break; // EOF reached
 
+        await file.read(4); // dirTimeNanoBytes
         await file.read(4); // padding
 
         var dirPath = await _readNullTerminatedString();
-        var directoryNode = Node(key: dirPath, label: dirPath, children: []);
-        rootNode!.children.add(directoryNode);
 
-        await _parseDirectoryContents(directoryNode);
+        // Find existing node or create one
+        var directoryNode = _findNodeByPath(dirPath);
+        if (directoryNode == null) {
+          directoryNode = Node(key: dirPath, label: dirPath, children: []);
+          rootNode!.children.add(directoryNode);
+        }
+
+        await _parseDirectoryContents(directoryNode, dirPath);
       } catch (e) {
         break;
       }
     }
   }
 
-  Future<void> _parseDirectoryContents(Node parentNode) async {
+  Future<void> _parseDirectoryContents(
+      Node parentNode, String parentPath) async {
     while (true) {
       var entryType = await file.readByte();
       if (entryType == 2) break; // End of current directory
 
       var fileName = await _readNullTerminatedString();
-      var entryNode = Node(key: fileName, label: fileName, children: []);
 
-      if (entryType == 1) {
-        await _parseDirectoryContents(entryNode);
-      }
-
+      var fullPath = parentPath == '/' ? '/$fileName' : '$parentPath/$fileName';
+      var entryNode = Node(key: fullPath, label: fileName, children: []);
       parentNode.children.add(entryNode);
+
+      // We do NOT recurse here. The spec says mlocate.db is just a
+      // list of directories. The subdirectories will be defined in their
+      // own directory header later in the file.
+      if (entryType == 1) {
+        // If it's a subdirectory, we can pre-add it to the root's list of
+        // directories so it can just be found later, or we let the next
+        // header create it if it doesn't exist.
+        rootNode!.children.add(entryNode);
+      }
     }
   }
 
@@ -206,6 +220,7 @@ class MlocateDBParser {
     var bytes = <int>[];
     while (true) {
       var byte = await file.readByte();
+      if (byte == -1) break; // EOF
       if (byte == 0) break;
       bytes.add(byte);
     }
@@ -213,6 +228,7 @@ class MlocateDBParser {
   }
 
   int _bytesToInt32(Uint8List bytes, {Endian endian = Endian.big}) {
+    if (bytes.length < 4) return 0;
     var buffer = ByteData.sublistView(bytes);
     return buffer.getInt32(0, endian);
   }
