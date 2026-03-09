@@ -1,0 +1,152 @@
+output: dist/
+releases:
+  - name: onlinux
+    jobs:
+# Broken pending: https://github.com/leanflutter/flutter_distributor/pull/221
+#      - name: linux-appimage
+#        package:
+#          platform: linux
+#          target: appimage
+#        publish:
+#          target: github
+#          args:
+#            repo-owner: arran4
+#            repo-name: linkwarden_mobile
+      - name: linux-deb
+        package:
+          platform: linux
+          target: deb
+        publish:
+          target: github
+          args:
+            repo-owner: arran4
+            repo-name: linkwarden_mobile
+      - name: linux-rpm
+        package:
+          platform: linux
+          target: rpm
+        publish:
+          target: github
+          args:
+            repo-owner: arran4
+            repo-name: linkwarden_mobile
+      - name: linux-pacman
+        package:
+          platform: linux
+          target: pacman
+        publish:
+          target: github
+          args:
+            repo-owner: arran4
+            repo-name: linkwarden_mobile
+      - name: linux-zip
+        package:
+          platform: linux
+          target: zip
+        publish:
+          target: github
+          args:
+            repo-owner: arran4
+            repo-name: linkwarden_mobile
+      - name: android-aab
+        package:
+          platform: android
+          target: aab
+          build_args:
+            target-platform: android-arm,android-arm64
+        publish:
+          target: github
+          args:
+            repo-owner: arran4
+            repo-name: linkwarden_mobile
+      - name: android-apk
+        package:
+          platform: android
+          target: apk
+          build_args:
+            target-platform: android-arm,android-arm64
+        publish:
+          target: github
+          args:
+            repo-owner: arran4
+            repo-name: linkwarden_mobile
+      - name: web-direct
+        package:
+          platform: web
+          target: direct
+        publish:
+          target: github
+          args:
+            repo-owner: arran4
+            repo-name: linkwarden_mobile
+  - name: onwindows
+    jobs:
+      - name: windows-exe
+        package:
+          platform: windows
+          target: exe
+        publish:
+          target: github
+          args:
+            repo-owner: arran4
+            repo-name: linkwarden_mobile
+      - name: windows-msix
+        package:
+          platform: windows
+          target: msix
+        publish:
+          target: github
+          args:
+            repo-owner: arran4
+            repo-name: linkwarden_mobile
+      - name: windows-zip
+        package:
+          platform: windows
+          target: zip
+        publish:
+          target: github
+          args:
+            repo-owner: arran4
+            repo-name: linkwarden_mobile
+  - name: onmac
+    jobs:
+# Disabled for packaging reasons atm.
+#      - name: ios-ipa
+#        package:
+#          platform: ios
+#          target: ipa
+#          build_args:
+#            export-method: ad-hoc
+#        publish:
+#          target: github
+#          args:
+#            repo-owner: arran4
+#            repo-name: linkwarden_mobile
+      - name: macos-dmg
+        package:
+          platform: macos
+          target: dmg
+        publish:
+          target: github
+          args:
+            repo-owner: arran4
+            repo-name: linkwarden_mobile
+# Disabled for packaging reasons atm.
+#      - name: macos-pkg
+#        package:
+#          platform: macos
+#          target: pkg
+#        publish:
+#          target: github
+#          args:
+#            repo-owner: arran4
+#            repo-name: linkwarden_mobile
+      - name: macos-zip
+        package:
+          platform: macos
+          target: zip
+        publish:
+          target: github
+          args:
+            repo-owner: arran4
+            repo-name: linkwarden_mobile

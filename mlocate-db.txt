@@ -1,0 +1,109 @@
+mlocate.db(5)                 File Formats Manual                mlocate.db(5)
+
+
+
+NAME
+       mlocate.db - a mlocate database
+
+
+DESCRIPTION
+       A  mlocate database starts with a file header: 8 bytes for a magic num-
+       ber ("\0mlocate" like a C literal), 4 bytes for the configuration block
+       size  in big endian, 1 byte for file format version (0), 1 byte for the
+       "require visibility" flag (0 or 1), 2 bytes padding, and  a  NUL-termi-
+       nated path name of the root of the database.
+
+       The  header  is  followed  by a configuration block, included to ensure
+       databases are not reused if some  configuration  changes  could  affect
+       their contents.  The size of the configuration block in bytes is stored
+       in the file header.  The configuration block is a sequence of  variable
+       assignments,  ordered  by variable name.  Each variable assignment con-
+       sists of a NUL-terminated variable name and an ordered list of NUL-ter-
+       minated  values.   The value list is terminated by one more NUL charac-
+       ter.  The ordering used is defined by the strcmp () function.
+
+       Currently defined variables are:
+
+       prune_bind_mounts
+              A single entry, the  value  of  PRUNE_BIND_MOUNTS;  one  of  the
+              strings 0 or 1.
+
+
+       prunefs
+              The value of PRUNEFS, each entry is converted to uppercase.
+
+
+       prunepaths
+              The value of PRUNEPATHS.
+
+
+       The  rest  of  the  file until EOF describes directories and their con-
+       tents.  Each directory starts with a header: 8 bytes for directory time
+       (seconds)  in  big  endian, 4 bytes for directory time (nanoseconds) in
+       big endian (0 if unknown, less than 1,000,000,000),  4  bytes  padding,
+       and  a  NUL-terminated  path name of the the directory.  Directory con-
+       tents, a sequence of file entries sorted by name, follow.
+
+       Directory time is the maximum of st_ctime and st_mtime  of  the  direc-
+       tory.   updatedb(8) uses the original data if the directory time in the
+       database and in the file system match exactly.  Directory time equal to
+       0  always causes rescanning of the directory: this is necessary to han-
+       dle directories which were being updated while building the database.
+
+       Each file entry starts with a single byte, marking its type:
+
+       0      A non-directory file.  Followed by a  NUL-terminated  file  (not
+              path) name.
+
+
+       1      A  subdirectory.   Followed  by a NUL-terminated file (not path)
+              name.
+
+
+       2      Marks the end of the current directory.
+
+
+       locate(1) only reports file entries, directory names are  not  reported
+       because  they  are reported as an entry in their parent directory.  The
+       only exception is the root directory of the database, which  is  stored
+       in the file header.
+
+
+AUTHOR
+       Miloslav Trmac <mitr@redhat.com>
+
+
+
+ATTRIBUTES
+       See attributes(7) for descriptions of the following attributes:
+
+
+       +---------------+------------------+
+       |ATTRIBUTE TYPE | ATTRIBUTE VALUE  |
+       +---------------+------------------+
+       |Availability   | file/mlocate     |
+       +---------------+------------------+
+       |Stability      | Uncommitted      |
+       +---------------+------------------+
+
+SEE ALSO
+       locate(1), updatedb.conf(5), updatedb(8)
+
+
+
+NOTES
+       Source  code  for open source software components in Oracle Solaris can
+       be found at https://www.oracle.com/downloads/opensource/solaris-source-
+       code-downloads.html.
+
+       This     software     was    built    from    source    available    at
+       https://github.com/oracle/solaris-userland.   The  original   community
+       source  was  downloaded  from  https://releases.pagure.org/mlocate/mlo-
+       cate-0.26.tar.xz.
+
+       Further information about this software can be found on the open source
+       community website at https://pagure.io/mlocate.
+
+
+
+mlocate                            Jan 2007                      mlocate.db(5)
