@@ -11,7 +11,7 @@ releases:
 #          target: github
 #          args:
 #            repo-owner: arran4
-#            repo-name: linkwarden_mobile
+#            repo-name: mlocate_explorer
       - name: linux-deb
         package:
           platform: linux
@@ -20,7 +20,7 @@ releases:
           target: github
           args:
             repo-owner: arran4
-            repo-name: linkwarden_mobile
+            repo-name: mlocate_explorer
       - name: linux-rpm
         package:
           platform: linux
@@ -29,7 +29,7 @@ releases:
           target: github
           args:
             repo-owner: arran4
-            repo-name: linkwarden_mobile
+            repo-name: mlocate_explorer
       - name: linux-pacman
         package:
           platform: linux
@@ -38,7 +38,7 @@ releases:
           target: github
           args:
             repo-owner: arran4
-            repo-name: linkwarden_mobile
+            repo-name: mlocate_explorer
       - name: linux-zip
         package:
           platform: linux
@@ -47,7 +47,7 @@ releases:
           target: github
           args:
             repo-owner: arran4
-            repo-name: linkwarden_mobile
+            repo-name: mlocate_explorer
       - name: android-aab
         package:
           platform: android
@@ -58,7 +58,7 @@ releases:
           target: github
           args:
             repo-owner: arran4
-            repo-name: linkwarden_mobile
+            repo-name: mlocate_explorer
       - name: android-apk
         package:
           platform: android
@@ -69,7 +69,7 @@ releases:
           target: github
           args:
             repo-owner: arran4
-            repo-name: linkwarden_mobile
+            repo-name: mlocate_explorer
       - name: web-direct
         package:
           platform: web
@@ -78,7 +78,7 @@ releases:
           target: github
           args:
             repo-owner: arran4
-            repo-name: linkwarden_mobile
+            repo-name: mlocate_explorer
   - name: onwindows
     jobs:
       - name: windows-exe
@@ -89,7 +89,7 @@ releases:
           target: github
           args:
             repo-owner: arran4
-            repo-name: linkwarden_mobile
+            repo-name: mlocate_explorer
       - name: windows-msix
         package:
           platform: windows
@@ -98,7 +98,7 @@ releases:
           target: github
           args:
             repo-owner: arran4
-            repo-name: linkwarden_mobile
+            repo-name: mlocate_explorer
       - name: windows-zip
         package:
           platform: windows
@@ -107,7 +107,7 @@ releases:
           target: github
           args:
             repo-owner: arran4
-            repo-name: linkwarden_mobile
+            repo-name: mlocate_explorer
   - name: onmac
     jobs:
 # Disabled for packaging reasons atm.
@@ -121,7 +121,7 @@ releases:
 #          target: github
 #          args:
 #            repo-owner: arran4
-#            repo-name: linkwarden_mobile
+#            repo-name: mlocate_explorer
       - name: macos-dmg
         package:
           platform: macos
@@ -130,7 +130,7 @@ releases:
           target: github
           args:
             repo-owner: arran4
-            repo-name: linkwarden_mobile
+            repo-name: mlocate_explorer
 # Disabled for packaging reasons atm.
 #      - name: macos-pkg
 #        package:
@@ -140,7 +140,7 @@ releases:
 #          target: github
 #          args:
 #            repo-owner: arran4
-#            repo-name: linkwarden_mobile
+#            repo-name: mlocate_explorer
       - name: macos-zip
         package:
           platform: macos
@@ -149,4 +149,4 @@ releases:
           target: github
           args:
             repo-owner: arran4
-            repo-name: linkwarden_mobile
+            repo-name: mlocate_explorer
