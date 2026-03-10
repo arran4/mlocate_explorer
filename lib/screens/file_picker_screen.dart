@@ -207,14 +207,24 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                           itemCount: currentNode.children.length,
                           itemBuilder: (context, index) {
                             final node = currentNode.children[index];
+
+                            final List<String> subtitleParts = [];
+                            if (node.isDir) {
+                              subtitleParts.add('${node.children.length} items');
+                            }
+                            if (node.modifiedTime != null) {
+                              subtitleParts.add('Modified: ${node.modifiedTime!.toLocal().toString()}');
+                            }
+                            final subtitleText = subtitleParts.isNotEmpty ? subtitleParts.join(' | ') : null;
+
                             return ListTile(
                               leading: Icon(
                                 node.isDir ? Icons.folder : Icons.insert_drive_file,
                                 color: node.isDir ? Colors.blue : Colors.grey,
                               ),
                               title: Text(node.label),
-                              subtitle: node.modifiedTime != null
-                                  ? Text('Modified: ${node.modifiedTime!.toLocal().toString()}')
+                              subtitle: subtitleText != null
+                                  ? Text(subtitleText)
                                   : null,
                               onTap: () => _navigateTo(node),
                             );
