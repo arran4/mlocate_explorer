@@ -3,7 +3,9 @@ import 'dart:isolate';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import '../models/node.dart';
 import '../services/mlocate_db_parser.dart';
@@ -31,8 +33,19 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
   Isolate? _isolate;
 
   final List<Node> _navigationStack = [];
+  final List<int> _indexStack = [];
+  int _selectedIndex = 0;
+
+  final ItemScrollController _itemScrollController = ItemScrollController();
+  final FocusNode _focusNode = FocusNode();
 
   ReceivePort? _receivePort;
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickFile() async {
     var result = await FilePicker.platform.pickFiles();
@@ -75,10 +88,28 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     });
   }
 
+  void _scrollToSelected() {
+    if (_itemScrollController.isAttached) {
+      _itemScrollController.scrollTo(
+        index: _selectedIndex,
+        duration: const Duration(milliseconds: 100),
+        alignment: 0.5,
+      );
+    }
+  }
+
   void _navigateUp() {
     if (_navigationStack.length > 1) {
       setState(() {
         _navigationStack.removeLast();
+        if (_indexStack.isNotEmpty) {
+          _selectedIndex = _indexStack.removeLast();
+        } else {
+          _selectedIndex = 0;
+        }
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToSelected();
       });
     }
   }
@@ -87,6 +118,11 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     if (node.isDir) {
       setState(() {
         _navigationStack.add(node);
+        _indexStack.add(_selectedIndex);
+        _selectedIndex = 0;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToSelected();
       });
     }
   }
@@ -203,22 +239,90 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                           onPressed: _pickFile,
                           child: const Text('Pick mlocate.db File'),
                         )
-                      : ListView.builder(
-                          itemCount: currentNode.children.length,
-                          itemBuilder: (context, index) {
-                            final node = currentNode.children[index];
-                            return ListTile(
-                              leading: Icon(
-                                node.isDir ? Icons.folder : Icons.insert_drive_file,
-                                color: node.isDir ? Colors.blue : Colors.grey,
-                              ),
-                              title: Text(node.label),
-                              subtitle: node.modifiedTime != null
-                                  ? Text('Modified: ${node.modifiedTime!.toLocal().toString()}')
-                                  : null,
-                              onTap: () => _navigateTo(node),
-                            );
+                      : Focus(
+                          autofocus: true,
+                          focusNode: _focusNode,
+                          onKeyEvent: (FocusNode node, KeyEvent event) {
+                            if (event is KeyDownEvent || event is KeyRepeatEvent) {
+                              final int maxIndex = currentNode.children.length - 1;
+                              if (maxIndex < 0) return KeyEventResult.ignored;
+
+                              if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                                setState(() {
+                                  _selectedIndex = (_selectedIndex + 1).clamp(0, maxIndex);
+                                });
+                                _scrollToSelected();
+                                return KeyEventResult.handled;
+                              } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                                setState(() {
+                                  _selectedIndex = (_selectedIndex - 1).clamp(0, maxIndex);
+                                });
+                                _scrollToSelected();
+                                return KeyEventResult.handled;
+                              } else if (event.logicalKey == LogicalKeyboardKey.pageDown) {
+                                setState(() {
+                                  _selectedIndex = (_selectedIndex + 10).clamp(0, maxIndex);
+                                });
+                                _scrollToSelected();
+                                return KeyEventResult.handled;
+                              } else if (event.logicalKey == LogicalKeyboardKey.pageUp) {
+                                setState(() {
+                                  _selectedIndex = (_selectedIndex - 10).clamp(0, maxIndex);
+                                });
+                                _scrollToSelected();
+                                return KeyEventResult.handled;
+                              } else if (event.logicalKey == LogicalKeyboardKey.home) {
+                                setState(() {
+                                  _selectedIndex = 0;
+                                });
+                                _scrollToSelected();
+                                return KeyEventResult.handled;
+                              } else if (event.logicalKey == LogicalKeyboardKey.end) {
+                                setState(() {
+                                  _selectedIndex = maxIndex;
+                                });
+                                _scrollToSelected();
+                                return KeyEventResult.handled;
+                              } else if (event.logicalKey == LogicalKeyboardKey.arrowRight ||
+                                         event.logicalKey == LogicalKeyboardKey.enter) {
+                                final selectedNode = currentNode.children[_selectedIndex];
+                                if (selectedNode.isDir) {
+                                  _navigateTo(selectedNode);
+                                }
+                                return KeyEventResult.handled;
+                              } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+                                         event.logicalKey == LogicalKeyboardKey.backspace) {
+                                _navigateUp();
+                                return KeyEventResult.handled;
+                              }
+                            }
+                            return KeyEventResult.ignored;
                           },
+                          child: ScrollablePositionedList.builder(
+                            itemScrollController: _itemScrollController,
+                            itemCount: currentNode.children.length,
+                            itemBuilder: (context, index) {
+                              final node = currentNode.children[index];
+                              return ListTile(
+                                leading: Icon(
+                                  node.isDir ? Icons.folder : Icons.insert_drive_file,
+                                  color: node.isDir ? Colors.blue : Colors.grey,
+                                ),
+                                title: Text(node.label),
+                                subtitle: node.modifiedTime != null
+                                    ? Text('Modified: ${node.modifiedTime!.toLocal().toString()}')
+                                    : null,
+                                selected: index == _selectedIndex,
+                                onTap: () {
+                                  setState(() {
+                                    _selectedIndex = index;
+                                  });
+                                  _navigateTo(node);
+                                  _focusNode.requestFocus();
+                                },
+                              );
+                            },
+                          ),
                         ),
             ),
           ),
