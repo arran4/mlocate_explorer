@@ -56,7 +56,7 @@ class MlocateDBParser {
 
     // DEBUG:
     var rootPath = _readNullTerminatedString();
-    rootNode = Node(key: rootPath, label: rootPath, children: []);
+    rootNode = Node(key: rootPath, label: rootPath, children: [], isDir: true);
     _nodeMap[rootPath] = rootNode!;
 
     _parseConfigurationBlock(configBlockSize);
@@ -91,8 +91,11 @@ class MlocateDBParser {
   void _parseDirectories() {
     while (true) {
       try {
-        var secBytes = file.readSync(8); // dirTimeSecBytes
+        var secBytes = Uint8List.fromList(file.readSync(8)); // dirTimeSecBytes
         if (secBytes.length < 8) break; // EOF reached
+
+        var modifiedTimeSeconds = _bytesToInt64(secBytes, endian: Endian.big);
+        var modifiedTime = DateTime.fromMillisecondsSinceEpoch(modifiedTimeSeconds * 1000, isUtc: true);
 
         file.readSync(4); // dirTimeNanoBytes
         file.readSync(4); // padding
@@ -106,7 +109,7 @@ class MlocateDBParser {
           var parentPath = _getParentPath(dirPath);
           var parentNode = _findNodeByPath(parentPath);
 
-          directoryNode = Node(key: dirPath, label: _getLabel(dirPath), children: []);
+          directoryNode = Node(key: dirPath, label: _getLabel(dirPath), children: [], isDir: true, modifiedTime: modifiedTime);
           _nodeMap[dirPath] = directoryNode;
 
           if (parentNode != null) {
@@ -115,6 +118,9 @@ class MlocateDBParser {
             // Fallback: attach to root if parent is mysteriously missing
             rootNode!.children.add(directoryNode);
           }
+        } else {
+          directoryNode.isDir = true;
+          directoryNode.modifiedTime = modifiedTime;
         }
 
         _parseDirectoryContents(directoryNode, dirPath);
@@ -133,7 +139,7 @@ class MlocateDBParser {
       var fileName = _readNullTerminatedString();
 
       var fullPath = parentPath == '/' ? '/$fileName' : '$parentPath/$fileName';
-      var entryNode = Node(key: fullPath, label: fileName, children: []);
+      var entryNode = Node(key: fullPath, label: fileName, children: [], isDir: entryType == 1);
       parentNode.children.add(entryNode);
 
       // We do NOT recurse here. The spec says mlocate.db is just a
@@ -177,5 +183,11 @@ class MlocateDBParser {
     if (bytes.length < 4) return 0;
     var buffer = ByteData.sublistView(bytes);
     return buffer.getInt32(0, endian);
+  }
+
+  int _bytesToInt64(Uint8List bytes, {Endian endian = Endian.big}) {
+    if (bytes.length < 8) return 0;
+    var buffer = ByteData.sublistView(bytes);
+    return buffer.getInt64(0, endian);
   }
 }
