@@ -215,7 +215,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                               title: Text(node.label),
                               subtitle: node.modifiedTime != null
                                   ? Text('Modified: ${node.modifiedTime!.toLocal().toString()}')
-                                  : null,
+                                  : Text(node.key),
                               onTap: () => _navigateTo(node),
                             );
                           },
