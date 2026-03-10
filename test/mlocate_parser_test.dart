@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mlocate_explorer/main.dart'; // Adjust import according to your package structure
+import 'package:mlocate_explorer/services/mlocate_db_parser.dart';
 
 import 'test_db_generator.dart';
 
@@ -41,7 +41,7 @@ void main() {
 
       // 2. Parse the generated DB
       final parser = MlocateDBParser(dbPath);
-      await parser.parse();
+      parser.parse(); // Updated to be synchronous
 
       // 3. Verify the parsed output matches our input structure
       expect(parser.rootNode, isNotNull);
