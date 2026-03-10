@@ -11,6 +11,9 @@ class MlocateDBParser {
   late RandomAccessFile file;
   Node? rootNode;
 
+  // Maps a full path to its corresponding Node for O(1) lookups
+  final Map<String, Node> _nodeMap = {};
+
   MlocateDBParser(this.filePath);
 
   void parse() {
@@ -54,6 +57,7 @@ class MlocateDBParser {
     // DEBUG:
     var rootPath = _readNullTerminatedString();
     rootNode = Node(key: rootPath, label: rootPath, children: []);
+    _nodeMap[rootPath] = rootNode!;
 
     _parseConfigurationBlock(configBlockSize);
   }
@@ -63,13 +67,7 @@ class MlocateDBParser {
     if (rootNode == null) return null;
     if (rootNode!.key == path || path == '/') return rootNode;
 
-    // A simple linear search for now, assuming the directories
-    // were added to rootNode's children (or we can flatten the structure).
-    // The previous implementation added flat directories directly to rootNode!.children
-    for (var node in rootNode!.children) {
-      if (node.key == path) return node;
-    }
-    return null;
+    return _nodeMap[path];
   }
 
   void _parseConfigurationBlock(int configBlockSize) {
@@ -104,8 +102,19 @@ class MlocateDBParser {
         // Find existing node or create one
         var directoryNode = _findNodeByPath(dirPath);
         if (directoryNode == null) {
-          directoryNode = Node(key: dirPath, label: dirPath, children: []);
-          rootNode!.children.add(directoryNode);
+          // If we haven't seen this directory yet, create it and attach it to its parent
+          var parentPath = _getParentPath(dirPath);
+          var parentNode = _findNodeByPath(parentPath);
+
+          directoryNode = Node(key: dirPath, label: _getLabel(dirPath), children: []);
+          _nodeMap[dirPath] = directoryNode;
+
+          if (parentNode != null) {
+            parentNode.children.add(directoryNode);
+          } else {
+            // Fallback: attach to root if parent is mysteriously missing
+            rootNode!.children.add(directoryNode);
+          }
         }
 
         _parseDirectoryContents(directoryNode, dirPath);
@@ -131,12 +140,26 @@ class MlocateDBParser {
       // list of directories. The subdirectories will be defined in their
       // own directory header later in the file.
       if (entryType == 1) {
-        // If it's a subdirectory, we can pre-add it to the root's list of
-        // directories so it can just be found later, or we let the next
-        // header create it if it doesn't exist.
-        rootNode!.children.add(entryNode);
+        // If it's a subdirectory, register it in the map so we can find it
+        // when its directory header is encountered later.
+        _nodeMap[fullPath] = entryNode;
       }
     }
+  }
+
+  String _getParentPath(String path) {
+    if (path == '/') return '/';
+    var lastSlash = path.lastIndexOf('/');
+    if (lastSlash == 0) return '/';
+    if (lastSlash == -1) return '/'; // Shouldn't happen for absolute paths
+    return path.substring(0, lastSlash);
+  }
+
+  String _getLabel(String path) {
+    if (path == '/') return '/';
+    var lastSlash = path.lastIndexOf('/');
+    if (lastSlash == -1) return path;
+    return path.substring(lastSlash + 1);
   }
 
   String _readNullTerminatedString() {
