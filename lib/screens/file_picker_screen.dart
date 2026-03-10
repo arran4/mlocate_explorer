@@ -14,7 +14,10 @@ void _parseIsolateEntry(Map<String, dynamic> args) {
 
   var parser = MlocateDBParser(filePath);
   parser.parse();
-  sendPort.send(parser.rootNode);
+  sendPort.send({
+    'rootNode': parser.rootNode,
+    'errors': parser.errors,
+  });
 }
 
 class FilePickerScreen extends StatefulWidget {
@@ -31,6 +34,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
   Isolate? _isolate;
 
   final List<Node> _navigationStack = [];
+  List<String> _parseErrors = [];
 
   ReceivePort? _receivePort;
 
@@ -50,7 +54,14 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
 
       _receivePort!.listen((message) {
         setState(() {
-          rootNode = message as Node?;
+          if (message is Map<String, dynamic>) {
+            rootNode = message['rootNode'] as Node?;
+            _parseErrors = List<String>.from(message['errors'] ?? []);
+          } else {
+            rootNode = message as Node?;
+            _parseErrors = [];
+          }
+
           if (rootNode != null) {
             _navigationStack.clear();
             _navigationStack.add(rootNode!);
@@ -138,6 +149,38 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     }
   }
 
+  void _showErrorsDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Parsing Errors & Inconsistencies'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _parseErrors.length,
+              itemBuilder: (context, index) {
+                return ListTile(
+                  leading: const Icon(Icons.error, color: Colors.red),
+                  title: Text(_parseErrors[index]),
+                );
+              },
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Close'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentNode = _navigationStack.isNotEmpty ? _navigationStack.last : null;
@@ -152,6 +195,12 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
               )
             : null,
         actions: [
+          if (_parseErrors.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.warning, color: Colors.orange),
+              onPressed: _showErrorsDialog,
+              tooltip: 'Show Parsing Errors',
+            ),
           if (currentNode != null)
             PopupMenuButton<String>(
               onSelected: (value) {
