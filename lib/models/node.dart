@@ -4,6 +4,7 @@ class Node {
   final List<Node> children;
   bool isDir;
   DateTime? modifiedTime;
+  bool isOpened;
 
   Node({
     required this.key,
@@ -11,5 +12,6 @@ class Node {
     this.children = const [],
     this.isDir = false,
     this.modifiedTime,
+    this.isOpened = false,
   });
 }
