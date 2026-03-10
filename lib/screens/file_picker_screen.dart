@@ -17,6 +17,8 @@ void _parseIsolateEntry(Map<String, dynamic> args) {
   sendPort.send(parser.rootNode);
 }
 
+enum SortOption { nameAsc, nameDesc, typeDirFirst, typeFileFirst }
+
 class FilePickerScreen extends StatefulWidget {
   const FilePickerScreen({super.key});
 
@@ -26,6 +28,9 @@ class FilePickerScreen extends StatefulWidget {
 
 class _FilePickerScreenState extends State<FilePickerScreen> {
   String? filePath;
+  String _searchQuery = '';
+  SortOption _sortOption = SortOption.typeDirFirst;
+  final TextEditingController _searchController = TextEditingController();
   Node? rootNode;
   bool _isLoading = false;
   Isolate? _isolate;
@@ -33,6 +38,12 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
   final List<Node> _navigationStack = [];
 
   ReceivePort? _receivePort;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickFile() async {
     var result = await FilePicker.platform.pickFiles();
@@ -56,6 +67,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
             _navigationStack.add(rootNode!);
           }
           _isLoading = false;
+          _searchQuery = '';
+          _searchController.text = '';
         });
         _receivePort?.close();
         _receivePort = null;
@@ -79,6 +92,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     if (_navigationStack.length > 1) {
       setState(() {
         _navigationStack.removeLast();
+        _searchQuery = '';
+        _searchController.text = '';
       });
     }
   }
@@ -87,6 +102,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     if (node.isDir) {
       setState(() {
         _navigationStack.add(node);
+        _searchQuery = '';
+        _searchController.text = '';
       });
     }
   }
@@ -142,6 +159,30 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
   Widget build(BuildContext context) {
     final currentNode = _navigationStack.isNotEmpty ? _navigationStack.last : null;
 
+    List<Node> displayedChildren = [];
+    if (currentNode != null) {
+      displayedChildren = currentNode.children.where((node) {
+        return node.label.toLowerCase().contains(_searchQuery.toLowerCase());
+      }).toList();
+
+      displayedChildren.sort((a, b) {
+        switch (_sortOption) {
+          case SortOption.nameAsc:
+            return a.label.compareTo(b.label);
+          case SortOption.nameDesc:
+            return b.label.compareTo(a.label);
+          case SortOption.typeDirFirst:
+            if (a.isDir && !b.isDir) return -1;
+            if (!a.isDir && b.isDir) return 1;
+            return a.label.compareTo(b.label);
+          case SortOption.typeFileFirst:
+            if (a.isDir && !b.isDir) return 1;
+            if (!a.isDir && b.isDir) return -1;
+            return a.label.compareTo(b.label);
+        }
+      });
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('mlocate DB Explorer'),
@@ -184,6 +225,59 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
             ),
+          if (currentNode != null && !_isLoading)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.search),
+                        hintText: 'Filter...',
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value;
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8.0),
+                  DropdownButton<SortOption>(
+                    value: _sortOption,
+                    onChanged: (SortOption? newValue) {
+                      if (newValue != null) {
+                        setState(() {
+                          _sortOption = newValue;
+                        });
+                      }
+                    },
+                    items: const [
+                      DropdownMenuItem(
+                        value: SortOption.nameAsc,
+                        child: Text('Name (A-Z)'),
+                      ),
+                      DropdownMenuItem(
+                        value: SortOption.nameDesc,
+                        child: Text('Name (Z-A)'),
+                      ),
+                      DropdownMenuItem(
+                        value: SortOption.typeDirFirst,
+                        child: Text('Dirs First'),
+                      ),
+                      DropdownMenuItem(
+                        value: SortOption.typeFileFirst,
+                        child: Text('Files First'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           Expanded(
             child: Center(
               child: _isLoading
@@ -204,9 +298,9 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                           child: const Text('Pick mlocate.db File'),
                         )
                       : ListView.builder(
-                          itemCount: currentNode.children.length,
+                          itemCount: displayedChildren.length,
                           itemBuilder: (context, index) {
-                            final node = currentNode.children[index];
+                            final node = displayedChildren[index];
                             return ListTile(
                               leading: Icon(
                                 node.isDir ? Icons.folder : Icons.insert_drive_file,
