@@ -37,32 +37,51 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
   Future<void> _pickFile() async {
     var result = await FilePicker.platform.pickFiles();
     if (result != null) {
-      setState(() {
-        filePath = result.files.single.path;
-        _isLoading = true;
-      });
-
-      _receivePort = ReceivePort();
-      _isolate = await Isolate.spawn(_parseIsolateEntry, {
-        'sendPort': _receivePort!.sendPort,
-        'filePath': filePath!,
-      });
-
-      _receivePort!.listen((message) {
-        setState(() {
-          rootNode = message as Node?;
-          if (rootNode != null) {
-            _navigationStack.clear();
-            _navigationStack.add(rootNode!);
-          }
-          _isLoading = false;
-        });
-        _receivePort?.close();
-        _receivePort = null;
-        _isolate?.kill(priority: Isolate.immediate);
-        _isolate = null;
-      });
+      _loadFile(result.files.single.path!);
     }
+  }
+
+  Future<void> _loadFile(String path) async {
+    setState(() {
+      filePath = path;
+      _isLoading = true;
+    });
+
+    _receivePort = ReceivePort();
+    _isolate = await Isolate.spawn(_parseIsolateEntry, {
+      'sendPort': _receivePort!.sendPort,
+      'filePath': filePath!,
+    });
+
+    _receivePort!.listen((message) {
+      setState(() {
+        rootNode = message as Node?;
+        if (rootNode != null) {
+          _navigationStack.clear();
+          _navigationStack.add(rootNode!);
+        }
+        _isLoading = false;
+      });
+      _receivePort?.close();
+      _receivePort = null;
+      _isolate?.kill(priority: Isolate.immediate);
+      _isolate = null;
+    });
+  }
+
+  void _reloadCurrent() {
+    if (filePath != null) {
+      _loadFile(filePath!);
+    }
+  }
+
+  void _closeDatabase() {
+    setState(() {
+      filePath = null;
+      rootNode = null;
+      _navigationStack.clear();
+      _isLoading = false;
+    });
   }
 
   void _cancelLoading() {
@@ -159,9 +178,28 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                   _exportDirectory(currentNode);
                 } else if (value == 'export_tree') {
                   _exportDirectoryTree(currentNode);
+                } else if (value == 'open_another') {
+                  _pickFile();
+                } else if (value == 'reload_current') {
+                  _reloadCurrent();
+                } else if (value == 'close_db') {
+                  _closeDatabase();
                 }
               },
               itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                const PopupMenuItem<String>(
+                  value: 'open_another',
+                  child: Text('Open Another Database'),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'reload_current',
+                  child: Text('Reload Current Database'),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'close_db',
+                  child: Text('Close Database'),
+                ),
+                const PopupMenuDivider(),
                 const PopupMenuItem<String>(
                   value: 'export_dir',
                   child: Text('Export Directory'),
