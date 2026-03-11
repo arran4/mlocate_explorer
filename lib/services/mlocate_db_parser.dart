@@ -13,7 +13,79 @@ class MlocateDBParser {
 
   // Maps a full path to its corresponding Node for O(1) lookups
   final Map<String, Node> _nodeMap = {};
-  final List<String> errors = [];
+  final List<Map<String, dynamic>> errors = [];
+  int get fileSize => file.lengthSync();
+  String _currentDirectoryPath = '/';
+
+
+  void _addError(String description) {
+    int offset = 0;
+    try {
+      offset = file.positionSync();
+    } catch (_) {}
+
+    double percentage = 0.0;
+    try {
+      if (fileSize > 0) {
+        percentage = (offset / fileSize) * 100;
+      }
+    } catch (_) {}
+
+    String hexDump = _generateHexDump(offset);
+
+    errors.add({
+      'description': description,
+      'offset': offset,
+      'percentage': percentage,
+      'directoryPath': _currentDirectoryPath,
+      'hexDump': hexDump,
+    });
+  }
+
+  String _generateHexDump(int offset) {
+    try {
+      int start = offset - 64;
+      if (start < 0) start = 0;
+      int length = 128;
+      if (start + length > fileSize) length = fileSize - start;
+
+      int currentPos = file.positionSync();
+      file.setPositionSync(start);
+      var bytes = file.readSync(length);
+      file.setPositionSync(currentPos);
+
+      StringBuffer buffer = StringBuffer();
+      for (int i = 0; i < bytes.length; i += 16) {
+        int chunkLen = (i + 16 < bytes.length) ? 16 : bytes.length - i;
+        var chunk = bytes.sublist(i, i + chunkLen);
+
+        buffer.write('${(start + i).toRadixString(16).padLeft(8, '0')}  ');
+
+        for (int j = 0; j < 16; j++) {
+          if (j < chunk.length) {
+            buffer.write('${chunk[j].toRadixString(16).padLeft(2, '0')} ');
+          } else {
+            buffer.write('   ');
+          }
+          if (j == 7) buffer.write(' ');
+        }
+
+        buffer.write(' |');
+        for (int j = 0; j < chunk.length; j++) {
+          int b = chunk[j];
+          if (b >= 32 && b <= 126) {
+            buffer.writeCharCode(b);
+          } else {
+            buffer.write('.');
+          }
+        }
+        buffer.write('|\n');
+      }
+      return buffer.toString();
+    } catch (e) {
+      return 'Could not generate hex dump: $e';
+    }
+  }
 
   MlocateDBParser(this.filePath);
 
@@ -74,7 +146,7 @@ class MlocateDBParser {
   void _parseFileHeader() {
     var header = Uint8List.fromList(file.readSync(8));
     if (!compareUint8Lists(header, magicNumber)) {
-      errors.add('Invalid magic number');
+      _addError('Invalid magic number');
     }
 
     var configBlockSizeBytes = file.readSync(4);
@@ -132,6 +204,7 @@ class MlocateDBParser {
         file.readSync(4); // padding
 
         var dirPath = _readNullTerminatedString();
+        _currentDirectoryPath = dirPath;
 
         // Find existing node or create one
         var directoryNode = _findNodeByPath(dirPath);
@@ -147,7 +220,7 @@ class MlocateDBParser {
             parentNode.children.add(directoryNode);
           } else {
             // Fallback: attach to root if parent is mysteriously missing
-            errors.add('Missing parent node for directory: $dirPath');
+            _addError('Missing parent node for directory: $dirPath');
             rootNode!.children.add(directoryNode);
           }
         } else {
@@ -157,7 +230,7 @@ class MlocateDBParser {
 
         _parseDirectoryContents(directoryNode, dirPath);
       } catch (e) {
-        errors.add('Error parsing directories: $e');
+        _addError('Error parsing directories: $e');
         break;
       }
     }
