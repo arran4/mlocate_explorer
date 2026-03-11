@@ -21,6 +21,30 @@ class MlocateDBParser {
     _parseFileHeader();
     _parseDirectories();
     file.closeSync();
+    _calculateCounts();
+  }
+
+  void _calculateCounts() {
+    // Post-process tree to compute counts bottom-up.
+    // We can do this recursively from root.
+    if (rootNode != null) {
+      _computeCountsForNode(rootNode!);
+    }
+  }
+
+  void _computeCountsForNode(Node node) {
+    node.fileCount = 0;
+    node.folderCount = 0;
+
+    for (var child in node.children) {
+      if (child.isDir) {
+        _computeCountsForNode(child);
+        node.folderCount += 1 + child.folderCount;
+        node.fileCount += child.fileCount;
+      } else {
+        node.fileCount += 1;
+      }
+    }
   }
 
   bool compareUint8Lists(Uint8List list1, Uint8List list2) {

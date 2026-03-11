@@ -4,6 +4,8 @@ class Node {
   final List<Node> children;
   bool isDir;
   DateTime? modifiedTime;
+  int fileCount = 0;
+  int folderCount = 0;
 
   Node({
     required this.key,

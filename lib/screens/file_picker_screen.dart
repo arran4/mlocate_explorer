@@ -210,7 +210,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
 
                             final List<String> subtitleParts = [];
                             if (node.isDir) {
-                              subtitleParts.add('${node.children.length} items');
+                              subtitleParts.add('${node.folderCount} folders, ${node.fileCount} files');
                             }
                             if (node.modifiedTime != null) {
                               subtitleParts.add('Modified: ${node.modifiedTime!.toLocal().toString()}');
