@@ -13,6 +13,7 @@ class MlocateDBParser {
 
   // Maps a full path to its corresponding Node for O(1) lookups
   final Map<String, Node> _nodeMap = {};
+  final List<String> errors = [];
 
   MlocateDBParser(this.filePath);
 
@@ -43,7 +44,7 @@ class MlocateDBParser {
   void _parseFileHeader() {
     var header = Uint8List.fromList(file.readSync(8));
     if (!compareUint8Lists(header, magicNumber)) {
-      throw const FormatException('Invalid magic number');
+      errors.add('Invalid magic number');
     }
 
     var configBlockSizeBytes = file.readSync(4);
@@ -116,6 +117,7 @@ class MlocateDBParser {
             parentNode.children.add(directoryNode);
           } else {
             // Fallback: attach to root if parent is mysteriously missing
+            errors.add('Missing parent node for directory: $dirPath');
             rootNode!.children.add(directoryNode);
           }
         } else {
@@ -125,6 +127,7 @@ class MlocateDBParser {
 
         _parseDirectoryContents(directoryNode, dirPath);
       } catch (e) {
+        errors.add('Error parsing directories: $e');
         break;
       }
     }
