@@ -166,6 +166,9 @@ jobs:
           sudo apt-get install -y rpm
           fpm -s dir -t rpm -n mlocate_explorer -v 1.0.0 --prefix /opt/mlocate_explorer build/linux/x64/release/bundle/=/opt/mlocate_explorer
 
+      - name: Build APK
+        run: |
+          fpm -s dir -t apk -n mlocate_explorer -v 1.0.0 --prefix /opt/mlocate_explorer build/linux/x64/release/bundle/=/opt/mlocate_explorer
       - name: Build Pacman
         run: |
           sudo apt-get install -y libarchive-tools zstd
@@ -202,6 +205,7 @@ jobs:
             mlocate_explorer-x86_64.AppImage
             *.deb
             *.rpm
+            *.apk
             *.flatpak
             *.pkg.tar.zst
 
