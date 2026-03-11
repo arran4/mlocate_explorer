@@ -201,7 +201,9 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         _selectedIndex = maxIndex;
       });
       _scrollToSelectedIndex();
-    } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+    } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+               event.logicalKey == LogicalKeyboardKey.backspace ||
+               (HardwareKeyboard.instance.isAltPressed && event.logicalKey == LogicalKeyboardKey.arrowUp)) {
       _navigateUp();
     } else if (event.logicalKey == LogicalKeyboardKey.arrowRight || event.logicalKey == LogicalKeyboardKey.enter) {
       if (displayedChildren.isNotEmpty && _selectedIndex >= 0 && _selectedIndex <= maxIndex) {
