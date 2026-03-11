@@ -166,6 +166,11 @@ jobs:
           sudo apt-get install -y rpm
           fpm -s dir -t rpm -n mlocate_explorer -v 1.0.0 --prefix /opt/mlocate_explorer build/linux/x64/release/bundle/=/opt/mlocate_explorer
 
+      - name: Build Pacman
+        run: |
+          sudo apt-get install -y libarchive-tools zstd
+          fpm -s dir -t pacman -n mlocate_explorer -v 1.0.0 --prefix /opt/mlocate_explorer build/linux/x64/release/bundle/=/opt/mlocate_explorer
+
       - name: Build Flatpak
         run: |
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
@@ -198,6 +203,7 @@ jobs:
             *.deb
             *.rpm
             *.flatpak
+            *.pkg.tar.zst
 
   build-windows:
     name: Build Windows
