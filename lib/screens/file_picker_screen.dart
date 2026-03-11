@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import '../models/node.dart';
 import '../services/mlocate_db_parser.dart';
@@ -40,14 +41,15 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
   Isolate? _isolate;
 
   final List<Node> _navigationStack = [];
-  final ScrollController _scrollController = ScrollController();
-  final Map<String, double> _scrollPositions = {};
+
+  final ItemScrollController _itemScrollController = ItemScrollController();
+  final FocusNode _listFocusNode = FocusNode();
+  int _selectedIndex = 0;
+  final Map<String, int> _selectedIndices = {};
 
   ReceivePort? _receivePort;
 
   List<String> _parseErrors = [];
-
-  ReceivePort? _receivePort;
 
   final TextEditingController _pathController = TextEditingController();
 
@@ -55,7 +57,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
   void dispose() {
     _pathController.dispose();
     _searchController.dispose();
-    _scrollController.dispose();
+    _listFocusNode.dispose();
     super.dispose();
   }
 
@@ -113,7 +115,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
   void _navigateUp() {
     if (_navigationStack.length > 1) {
       final currentNode = _navigationStack.last;
-      _scrollPositions[currentNode.key] = 0.0; // Reset scroll for current node when navigating up
+      _selectedIndices[currentNode.key] = 0;
+
       setState(() {
         _navigationStack.removeLast();
         _searchQuery = '';
@@ -122,12 +125,20 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       });
 
       final parentNode = _navigationStack.last;
-      final savedScrollPosition = _scrollPositions[parentNode.key] ?? 0.0;
+      final savedSelectedIndex = _selectedIndices[parentNode.key] ?? 0;
+
+      setState(() {
+        _selectedIndex = savedSelectedIndex;
+      });
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) {
-          _scrollController.jumpTo(savedScrollPosition);
+        if (_itemScrollController.isAttached) {
+            _itemScrollController.scrollTo(
+                index: savedSelectedIndex,
+                duration: const Duration(milliseconds: 100),
+                curve: Curves.easeInOut);
         }
+        _listFocusNode.requestFocus();
       });
     }
   }
@@ -136,15 +147,77 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     if (node.isDir) {
       node.isOpened = true;
       final currentNode = _navigationStack.last;
-      if (_scrollController.hasClients) {
-        _scrollPositions[currentNode.key] = _scrollController.offset;
-      }
+      _selectedIndices[currentNode.key] = _selectedIndex;
+
       setState(() {
         _navigationStack.add(node);
         _searchQuery = '';
         _searchController.text = '';
         _pathController.text = node.key;
+        _selectedIndex = 0;
       });
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_itemScrollController.isAttached) {
+            _itemScrollController.jumpTo(index: 0);
+        }
+        _listFocusNode.requestFocus();
+      });
+    }
+  }
+
+  void _handleKeyEvent(KeyEvent event, List<Node> displayedChildren) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return;
+
+    final maxIndex = displayedChildren.isEmpty ? 0 : displayedChildren.length - 1;
+
+    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      setState(() {
+        _selectedIndex = (_selectedIndex + 1).clamp(0, maxIndex);
+      });
+      _scrollToSelectedIndex();
+    } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      setState(() {
+        _selectedIndex = (_selectedIndex - 1).clamp(0, maxIndex);
+      });
+      _scrollToSelectedIndex();
+    } else if (event.logicalKey == LogicalKeyboardKey.pageDown) {
+      setState(() {
+        _selectedIndex = (_selectedIndex + 10).clamp(0, maxIndex);
+      });
+      _scrollToSelectedIndex();
+    } else if (event.logicalKey == LogicalKeyboardKey.pageUp) {
+      setState(() {
+        _selectedIndex = (_selectedIndex - 10).clamp(0, maxIndex);
+      });
+      _scrollToSelectedIndex();
+    } else if (event.logicalKey == LogicalKeyboardKey.home) {
+       setState(() {
+        _selectedIndex = 0;
+      });
+      _scrollToSelectedIndex();
+    } else if (event.logicalKey == LogicalKeyboardKey.end) {
+       setState(() {
+        _selectedIndex = maxIndex;
+      });
+      _scrollToSelectedIndex();
+    } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+      _navigateUp();
+    } else if (event.logicalKey == LogicalKeyboardKey.arrowRight || event.logicalKey == LogicalKeyboardKey.enter) {
+      if (displayedChildren.isNotEmpty && _selectedIndex >= 0 && _selectedIndex <= maxIndex) {
+        final selectedNode = displayedChildren[_selectedIndex];
+        _navigateTo(selectedNode);
+      }
+    }
+  }
+
+  void _scrollToSelectedIndex() {
+    if (_itemScrollController.isAttached) {
+      _itemScrollController.scrollTo(
+        index: _selectedIndex,
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeInOut,
+      );
     }
   }
 
@@ -199,8 +272,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         _pathController.text = _navigationStack.last.key;
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) {
-          _scrollController.jumpTo(0.0);
+        if (_itemScrollController.isAttached) {
+          _itemScrollController.jumpTo(index: 0);
         }
       });
     }
@@ -448,67 +521,83 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                           onPressed: _pickFile,
                           child: const Text('Pick mlocate.db File'),
                         )
-                      : ListView.builder(
-                          controller: _scrollController,
-                          itemCount: currentNode.children.length,
-                          itemBuilder: (context, index) {
-                            final node = currentNode.children[index];
-                            final isUnvisitedFolder = node.isDir && !node.isOpened;
-                            return GestureDetector(
-                              onSecondaryTapDown: (TapDownDetails details) {
-                                showMenu(
-                                  context: context,
-                                  position: RelativeRect.fromLTRB(
-                                    details.globalPosition.dx,
-                                    details.globalPosition.dy,
-                                    details.globalPosition.dx,
-                                    details.globalPosition.dy,
-                                  ),
-                                  items: [
-                                    PopupMenuItem(
-                                      value: 'toggle_opened',
-                                      child: Text(node.isOpened ? 'Mark as Unopened' : 'Mark as Opened'),
+                      : KeyboardListener(
+                          focusNode: _listFocusNode,
+                          autofocus: true,
+                          onKeyEvent: (event) => _handleKeyEvent(event, displayedChildren),
+                          child: ScrollablePositionedList.builder(
+                            itemScrollController: _itemScrollController,
+                            itemCount: displayedChildren.length,
+                            itemBuilder: (context, index) {
+                              final node = displayedChildren[index];
+                              final isUnvisitedFolder = node.isDir && !node.isOpened;
+                              final isSelected = index == _selectedIndex;
+
+                              return GestureDetector(
+                                onSecondaryTapDown: (TapDownDetails details) {
+                                  showMenu(
+                                    context: context,
+                                    position: RelativeRect.fromLTRB(
+                                      details.globalPosition.dx,
+                                      details.globalPosition.dy,
+                                      details.globalPosition.dx,
+                                      details.globalPosition.dy,
                                     ),
-                                    const PopupMenuItem(
-                                      value: 'copy_path',
-                                      child: Text('Copy Full Path'),
-                                    ),
-                                  ],
-                                ).then((value) {
-                                  if (value == 'toggle_opened') {
-                                    setState(() {
-                                      node.isOpened = !node.isOpened;
-                                    });
-                                  } else if (value == 'copy_path') {
-                                    Clipboard.setData(ClipboardData(text: node.key));
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Copied path to clipboard')),
-                                      );
+                                    items: [
+                                      PopupMenuItem(
+                                        value: 'toggle_opened',
+                                        child: Text(node.isOpened ? 'Mark as Unopened' : 'Mark as Opened'),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'copy_path',
+                                        child: Text('Copy Full Path'),
+                                      ),
+                                    ],
+                                  ).then((value) {
+                                    if (value == 'toggle_opened') {
+                                      setState(() {
+                                        node.isOpened = !node.isOpened;
+                                      });
+                                    } else if (value == 'copy_path') {
+                                      Clipboard.setData(ClipboardData(text: node.key));
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Copied path to clipboard')),
+                                        );
+                                      }
                                     }
-                                  }
-                                });
-                              },
-                              child: ListTile(
-                                dense: true,
-                                visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
-                                leading: Icon(
-                                  node.isDir ? Icons.folder : Icons.insert_drive_file,
-                                  color: node.isDir ? Colors.blue : Colors.grey,
-                                ),
-                                title: Text(
-                                  node.label,
-                                  style: TextStyle(
-                                    fontWeight: isUnvisitedFolder ? FontWeight.bold : FontWeight.normal,
+                                  });
+                                },
+                                child: Container(
+                                  color: isSelected ? Colors.blue.withAlpha(50) : null,
+                                  child: ListTile(
+                                    dense: true,
+                                    visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
+                                    leading: Icon(
+                                      node.isDir ? Icons.folder : Icons.insert_drive_file,
+                                      color: node.isDir ? Colors.blue : Colors.grey,
+                                    ),
+                                    title: Text(
+                                      node.label,
+                                      style: TextStyle(
+                                        fontWeight: isUnvisitedFolder ? FontWeight.bold : FontWeight.normal,
+                                      ),
+                                    ),
+                                    subtitle: node.modifiedTime != null
+                                        ? Text('Modified: ${node.modifiedTime!.toLocal().toString()}')
+                                        : null,
+                                    onTap: () {
+                                      setState(() {
+                                        _selectedIndex = index;
+                                      });
+                                      _listFocusNode.requestFocus();
+                                      _navigateTo(node);
+                                    },
                                   ),
                                 ),
-                                subtitle: node.modifiedTime != null
-                                    ? Text('Modified: ${node.modifiedTime!.toLocal().toString()}')
-                                    : null,
-                                onTap: () => _navigateTo(node),
-                              ),
-                            );
-                          },
+                              );
+                            },
+                          ),
                         ),
             ),
           ),
