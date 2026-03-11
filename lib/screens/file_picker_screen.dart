@@ -32,6 +32,7 @@ void _parseIsolateEntry(Map<String, dynamic> args) {
 }
 
 enum GroupOption { dirsFirst, filesFirst, none }
+
 enum SortOption { nameAsc, nameDesc, modifiedAsc, modifiedDesc, mlocateOrder }
 
 class FilePickerScreen extends StatefulWidget {
@@ -154,7 +155,10 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       Node current = queue.removeLast();
 
       if (!_showHiddenFiles && current != rootNode) {
-        if (current.label.isNotEmpty && current.label.startsWith('.') && current.label != '.' && current.label != '..') {
+        if (current.label.isNotEmpty &&
+            current.label.startsWith('.') &&
+            current.label != '.' &&
+            current.label != '..') {
           continue;
         }
       }
@@ -225,7 +229,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         } else if (message['type'] == 'done') {
           setState(() {
             rootNode = message['rootNode'] as Node?;
-            _parseErrors = List<Map<String, dynamic>>.from(message['errors'] ?? []);
+            _parseErrors =
+                List<Map<String, dynamic>>.from(message['errors'] ?? []);
 
             if (rootNode != null) {
               _navigationStack.clear();
@@ -248,7 +253,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       setState(() {
         if (message is Map<String, dynamic>) {
           rootNode = message['rootNode'] as Node?;
-          _parseErrors = List<Map<String, dynamic>>.from(message['errors'] ?? []);
+          _parseErrors =
+              List<Map<String, dynamic>>.from(message['errors'] ?? []);
         } else {
           rootNode = message as Node?;
           _parseErrors = [];
@@ -283,7 +289,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
   void _navigateUp() {
     if (_navigationStack.length > 1) {
       final currentNode = _navigationStack.last;
-      _scrollPositions[currentNode.key] = 0.0; // Reset scroll for current node when navigating up
+      _scrollPositions[currentNode.key] =
+          0.0; // Reset scroll for current node when navigating up
       setState(() {
         _navigationStack.removeLast();
         _searchQuery = '';
@@ -325,17 +332,20 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     }
   }
 
-  List<Node>? _findStackToPath(Node current, String targetPath, List<Node> currentStack) {
+  List<Node>? _findStackToPath(
+      Node current, String targetPath, List<Node> currentStack) {
     currentStack.add(current);
 
     if (current.key == targetPath) {
       return currentStack;
     }
 
-    if (targetPath.startsWith(current.key == '/' ? current.key : '${current.key}/')) {
+    if (targetPath
+        .startsWith(current.key == '/' ? current.key : '${current.key}/')) {
       for (final child in current.children) {
         if (child.isDir) {
-          final result = _findStackToPath(child, targetPath, List.from(currentStack));
+          final result =
+              _findStackToPath(child, targetPath, List.from(currentStack));
           if (result != null) {
             return result;
           }
@@ -398,7 +408,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
 
     var path = submittedPath.trim();
     if (path.isEmpty) {
-       setState(() {
+      setState(() {
         _pathController.text = _navigationStack.last.key;
       });
       return;
@@ -445,7 +455,10 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     if (savePath != null) {
       final buffer = StringBuffer();
       for (final child in node.children) {
-        if (!_showHiddenFiles && child.label.startsWith('.') && child.label != '.' && child.label != '..') {
+        if (!_showHiddenFiles &&
+            child.label.startsWith('.') &&
+            child.label != '.' &&
+            child.label != '..') {
           continue;
         }
         buffer.writeln(child.key);
@@ -460,7 +473,10 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
   }
 
   void _collectTree(Node node, StringBuffer buffer) {
-    if (!_showHiddenFiles && node.label.startsWith('.') && node.label != '.' && node.label != '..') {
+    if (!_showHiddenFiles &&
+        node.label.startsWith('.') &&
+        node.label != '.' &&
+        node.label != '..') {
       return;
     }
     buffer.writeln(node.key);
@@ -489,7 +505,6 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     }
   }
 
-
   void _showErrorDetails(Map<String, dynamic> error) {
     showDialog(
       context: context,
@@ -502,7 +517,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text('Description: ${error['description']}'),
-                Text('Offset: ${error['offset']} (${error['percentage'].toStringAsFixed(2)}%)'),
+                Text(
+                    'Offset: ${error['offset']} (${error['percentage'].toStringAsFixed(2)}%)'),
                 Text('Directory: ${error['directoryPath']}'),
                 const SizedBox(height: 10),
                 const Text('Hex Dump:'),
@@ -511,7 +527,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                   color: Colors.grey[200],
                   child: SelectableText(
                     error['hexDump'] ?? 'No hex dump available.',
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                    style:
+                        const TextStyle(fontFamily: 'monospace', fontSize: 12),
                   ),
                 ),
               ],
@@ -520,14 +537,14 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Clipboard.setData(ClipboardData(text:
-                  'Description: ${error['description']}\n'
-                  'Offset: ${error['offset']} (${error['percentage'].toStringAsFixed(2)}%)\n'
-                  'Directory: ${error['directoryPath']}\n\n'
-                  'Hex Dump:\n${error['hexDump']}'
-                ));
+                Clipboard.setData(ClipboardData(
+                    text: 'Description: ${error['description']}\n'
+                        'Offset: ${error['offset']} (${error['percentage'].toStringAsFixed(2)}%)\n'
+                        'Directory: ${error['directoryPath']}\n\n'
+                        'Hex Dump:\n${error['hexDump']}'));
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Error details copied to clipboard')),
+                  const SnackBar(
+                      content: Text('Error details copied to clipboard')),
                 );
               },
               child: const Text('Copy to Clipboard'),
@@ -543,7 +560,6 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
   }
 
   void _showErrorsDialog() {
-
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -558,19 +574,21 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                 return ListTile(
                   leading: const Icon(Icons.error, color: Colors.red),
                   title: Text(_parseErrors[index]['description']),
-                  subtitle: Text('Offset: ${_parseErrors[index]['offset']} (${_parseErrors[index]['percentage'].toStringAsFixed(2)}%) in ${_parseErrors[index]['directoryPath']}'),
+                  subtitle: Text(
+                      'Offset: ${_parseErrors[index]['offset']} (${_parseErrors[index]['percentage'].toStringAsFixed(2)}%) in ${_parseErrors[index]['directoryPath']}'),
                   onTap: () => _showErrorDetails(_parseErrors[index]),
                   trailing: IconButton(
                     icon: const Icon(Icons.copy),
                     onPressed: () {
-                      Clipboard.setData(ClipboardData(text:
-                        'Description: ${_parseErrors[index]['description']}\n'
-                        'Offset: ${_parseErrors[index]['offset']} (${_parseErrors[index]['percentage'].toStringAsFixed(2)}%)\n'
-                        'Directory: ${_parseErrors[index]['directoryPath']}\n\n'
-                        'Hex Dump:\n${_parseErrors[index]['hexDump']}'
-                      ));
+                      Clipboard.setData(ClipboardData(
+                          text:
+                              'Description: ${_parseErrors[index]['description']}\n'
+                              'Offset: ${_parseErrors[index]['offset']} (${_parseErrors[index]['percentage'].toStringAsFixed(2)}%)\n'
+                              'Directory: ${_parseErrors[index]['directoryPath']}\n\n'
+                              'Hex Dump:\n${_parseErrors[index]['hexDump']}'));
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Error details copied to clipboard')),
+                        const SnackBar(
+                            content: Text('Error details copied to clipboard')),
                       );
                     },
                   ),
@@ -593,12 +611,16 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentNode = _navigationStack.isNotEmpty ? _navigationStack.last : null;
+    final currentNode =
+        _navigationStack.isNotEmpty ? _navigationStack.last : null;
 
     List<Node> displayedChildren = [];
     if (currentNode != null) {
       displayedChildren = currentNode.children.where((node) {
-        if (!_showHiddenFiles && node.label.startsWith('.') && node.label != '.' && node.label != '..') {
+        if (!_showHiddenFiles &&
+            node.label.startsWith('.') &&
+            node.label != '.' &&
+            node.label != '..') {
           return false;
         }
         return node.label.toLowerCase().contains(_searchQuery.toLowerCase());
@@ -711,7 +733,9 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
               itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
                 PopupMenuItem<String>(
                   value: 'toggle_hidden',
-                  child: Text(_showHiddenFiles ? 'Hide Hidden Files' : 'Show Hidden Files'),
+                  child: Text(_showHiddenFiles
+                      ? 'Hide Hidden Files'
+                      : 'Show Hidden Files'),
                 ),
                 const PopupMenuDivider(),
                 const PopupMenuItem<String>(
@@ -775,7 +799,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                       children: [
                         const Text(
                           'Current Path: ',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                         Expanded(
                           child: TextField(
@@ -783,7 +808,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                             onSubmitted: _onPathSubmitted,
                             decoration: const InputDecoration(
                               isDense: true,
-                              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 8),
                               border: OutlineInputBorder(),
                             ),
                           ),
@@ -793,7 +819,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
             ),
           if (currentNode != null && !_isLoading && !_isLocateMode)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
               child: Row(
                 children: [
                   Expanded(
@@ -883,7 +910,9 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                         CircularProgressIndicator(value: _loadingProgress),
                         const SizedBox(height: 20),
                         if (_loadingStatus != null)
-                          Text(_loadingStatus!, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          Text(_loadingStatus!,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 20),
                         ElevatedButton(
                           onPressed: _cancelLoading,
@@ -899,7 +928,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                       : _isLocateMode
                           ? Column(
                               children: [
-                                if (_isLocating) const LinearProgressIndicator(),
+                                if (_isLocating)
+                                  const LinearProgressIndicator(),
                                 Expanded(
                                   child: ListView.builder(
                                     itemCount: _locateResults.length,
@@ -907,10 +937,15 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                       final node = _locateResults[index];
                                       return ListTile(
                                         dense: true,
-                                        visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
+                                        visualDensity: const VisualDensity(
+                                            horizontal: 0, vertical: -4),
                                         leading: Icon(
-                                          node.isDir ? Icons.folder : Icons.insert_drive_file,
-                                          color: node.isDir ? Colors.blue : Colors.grey,
+                                          node.isDir
+                                              ? Icons.folder
+                                              : Icons.insert_drive_file,
+                                          color: node.isDir
+                                              ? Colors.blue
+                                              : Colors.grey,
                                         ),
                                         title: Text(node.key),
                                         onTap: () => _jumpToLocateResult(node),
@@ -923,17 +958,22 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                           : Focus(
                               autofocus: true,
                               onKeyEvent: (node, event) {
-                                if (event is KeyDownEvent || event is KeyRepeatEvent) {
-                                  if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                                    if (_selectedIndex < displayedChildren.length - 1) {
+                                if (event is KeyDownEvent ||
+                                    event is KeyRepeatEvent) {
+                                  if (event.logicalKey ==
+                                      LogicalKeyboardKey.arrowDown) {
+                                    if (_selectedIndex <
+                                        displayedChildren.length - 1) {
                                       setState(() {
                                         _selectedIndex++;
                                         _scrollToSelectedIndex();
                                       });
                                     }
                                     return KeyEventResult.handled;
-                                  } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                                    if (HardwareKeyboard.instance.isAltPressed) {
+                                  } else if (event.logicalKey ==
+                                      LogicalKeyboardKey.arrowUp) {
+                                    if (HardwareKeyboard
+                                        .instance.isAltPressed) {
                                       _navigateUp();
                                     } else if (_selectedIndex > 0) {
                                       setState(() {
@@ -942,26 +982,42 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                       });
                                     }
                                     return KeyEventResult.handled;
-                                  } else if (event.logicalKey == LogicalKeyboardKey.pageDown) {
-                                    if (displayedChildren.isEmpty) return KeyEventResult.ignored;
+                                  } else if (event.logicalKey ==
+                                      LogicalKeyboardKey.pageDown) {
+                                    if (displayedChildren.isEmpty)
+                                      return KeyEventResult.ignored;
                                     setState(() {
-                                      _selectedIndex = (_selectedIndex + 10).clamp(0, displayedChildren.length - 1).toInt();
+                                      _selectedIndex = (_selectedIndex + 10)
+                                          .clamp(
+                                              0, displayedChildren.length - 1)
+                                          .toInt();
                                       _scrollToSelectedIndex();
                                     });
                                     return KeyEventResult.handled;
-                                  } else if (event.logicalKey == LogicalKeyboardKey.pageUp) {
-                                    if (displayedChildren.isEmpty) return KeyEventResult.ignored;
+                                  } else if (event.logicalKey ==
+                                      LogicalKeyboardKey.pageUp) {
+                                    if (displayedChildren.isEmpty)
+                                      return KeyEventResult.ignored;
                                     setState(() {
-                                      _selectedIndex = (_selectedIndex - 10).clamp(0, displayedChildren.length - 1).toInt();
+                                      _selectedIndex = (_selectedIndex - 10)
+                                          .clamp(
+                                              0, displayedChildren.length - 1)
+                                          .toInt();
                                       _scrollToSelectedIndex();
                                     });
                                     return KeyEventResult.handled;
-                                  } else if (event.logicalKey == LogicalKeyboardKey.backspace) {
+                                  } else if (event.logicalKey ==
+                                      LogicalKeyboardKey.backspace) {
                                     _navigateUp();
                                     return KeyEventResult.handled;
-                                  } else if (event.logicalKey == LogicalKeyboardKey.enter) {
-                                    if (displayedChildren.isNotEmpty && _selectedIndex >= 0 && _selectedIndex < displayedChildren.length) {
-                                      _navigateTo(displayedChildren[_selectedIndex]);
+                                  } else if (event.logicalKey ==
+                                      LogicalKeyboardKey.enter) {
+                                    if (displayedChildren.isNotEmpty &&
+                                        _selectedIndex >= 0 &&
+                                        _selectedIndex <
+                                            displayedChildren.length) {
+                                      _navigateTo(
+                                          displayedChildren[_selectedIndex]);
                                     }
                                     return KeyEventResult.handled;
                                   }
@@ -973,77 +1029,97 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                 itemCount: displayedChildren.length,
                                 itemBuilder: (context, index) {
                                   final listNode = displayedChildren[index];
-                                  final isUnvisitedFolder = listNode.isDir && !listNode.isOpened;
-                              return GestureDetector(
-                              onSecondaryTapDown: (TapDownDetails details) {
-                                showMenu(
-                                  context: context,
-                                  position: RelativeRect.fromLTRB(
-                                    details.globalPosition.dx,
-                                    details.globalPosition.dy,
-                                    details.globalPosition.dx,
-                                    details.globalPosition.dy,
-                                  ),
-                                  items: [
-                                    PopupMenuItem(
-                                      value: 'toggle_opened',
-                                      child: Text(listNode.isOpened ? 'Mark as Unopened' : 'Mark as Opened'),
-                                    ),
-                                    const PopupMenuItem(
-                                      value: 'copy_path',
-                                      child: Text('Copy Full Path'),
-                                    ),
-                                  ],
-                                ).then((value) {
-                                  if (value == 'toggle_opened') {
-                                    setState(() {
-                                      listNode.isOpened = !listNode.isOpened;
-                                    });
-                                  } else if (value == 'copy_path') {
-                                    Clipboard.setData(ClipboardData(text: listNode.key));
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Copied path to clipboard')),
-                                      );
-                                    }
-                                  }
-                                });
-                              },
-                              child: ListTile(
-                                dense: true,
-                                selected: index == _selectedIndex,
-                                selectedTileColor: Colors.blue.withAlpha(25),
-                                visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
-                                leading: Icon(
-                                  listNode.isDir ? Icons.folder : Icons.insert_drive_file,
-                                  color: listNode.isDir ? Colors.blue : Colors.grey,
-                                ),
-                                title: Text(
-                                  listNode.label,
-                                  style: TextStyle(
-                                    fontWeight: isUnvisitedFolder ? FontWeight.bold : FontWeight.normal,
-                                  ),
-                                ),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (listNode.isDir)
-                                      Text(
-                                        'Sub: ${listNode.subFileCount} files, ${listNode.subFolderCount} dirs | Deep: ${listNode.deepFileCount} files, ${listNode.deepFolderCount} dirs',
-                                        style: const TextStyle(fontSize: 12),
+                                  final isUnvisitedFolder =
+                                      listNode.isDir && !listNode.isOpened;
+                                  return GestureDetector(
+                                    onSecondaryTapDown:
+                                        (TapDownDetails details) {
+                                      showMenu(
+                                        context: context,
+                                        position: RelativeRect.fromLTRB(
+                                          details.globalPosition.dx,
+                                          details.globalPosition.dy,
+                                          details.globalPosition.dx,
+                                          details.globalPosition.dy,
+                                        ),
+                                        items: [
+                                          PopupMenuItem(
+                                            value: 'toggle_opened',
+                                            child: Text(listNode.isOpened
+                                                ? 'Mark as Unopened'
+                                                : 'Mark as Opened'),
+                                          ),
+                                          const PopupMenuItem(
+                                            value: 'copy_path',
+                                            child: Text('Copy Full Path'),
+                                          ),
+                                        ],
+                                      ).then((value) {
+                                        if (value == 'toggle_opened') {
+                                          setState(() {
+                                            listNode.isOpened =
+                                                !listNode.isOpened;
+                                          });
+                                        } else if (value == 'copy_path') {
+                                          Clipboard.setData(ClipboardData(
+                                              text: listNode.key));
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              const SnackBar(
+                                                  content: Text(
+                                                      'Copied path to clipboard')),
+                                            );
+                                          }
+                                        }
+                                      });
+                                    },
+                                    child: ListTile(
+                                      dense: true,
+                                      selected: index == _selectedIndex,
+                                      selectedTileColor:
+                                          Colors.blue.withAlpha(25),
+                                      visualDensity: const VisualDensity(
+                                          horizontal: 0, vertical: -4),
+                                      leading: Icon(
+                                        listNode.isDir
+                                            ? Icons.folder
+                                            : Icons.insert_drive_file,
+                                        color: listNode.isDir
+                                            ? Colors.blue
+                                            : Colors.grey,
                                       ),
-                                    if (listNode.modifiedTime != null)
-                                      Text('Modified: ${listNode.modifiedTime!.toLocal().toString()}'),
-                                  ],
-                                ),
-                                onTap: () {
-                                  setState(() {
-                                    _selectedIndex = index;
-                                  });
-                                  _navigateTo(listNode);
-                                },
-                              ),
-                            );
+                                      title: Text(
+                                        listNode.label,
+                                        style: TextStyle(
+                                          fontWeight: isUnvisitedFolder
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                        ),
+                                      ),
+                                      subtitle: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          if (listNode.isDir)
+                                            Text(
+                                              'Sub: ${listNode.subFileCount} files, ${listNode.subFolderCount} dirs | Deep: ${listNode.deepFileCount} files, ${listNode.deepFolderCount} dirs',
+                                              style:
+                                                  const TextStyle(fontSize: 12),
+                                            ),
+                                          if (listNode.modifiedTime != null)
+                                            Text(
+                                                'Modified: ${listNode.modifiedTime!.toLocal().toString()}'),
+                                        ],
+                                      ),
+                                      onTap: () {
+                                        setState(() {
+                                          _selectedIndex = index;
+                                        });
+                                        _navigateTo(listNode);
+                                      },
+                                    ),
+                                  );
                                 },
                               ),
                             ),

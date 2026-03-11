@@ -19,7 +19,6 @@ class MlocateDBParser {
   int _nodeCounter = 0;
   int _calculatedNodes = 0;
 
-
   void _addError(String description) {
     int offset = 0;
     try {
@@ -107,8 +106,10 @@ class MlocateDBParser {
     if (onProgress != null) {
       _calculatedNodes++;
       if (_calculatedNodes % 1024 == 0) {
-        double calculateProgress = _nodeCounter > 0 ? (_calculatedNodes / _nodeCounter) : 0.0;
-        onProgress!(0.9 + (calculateProgress * 0.1), 'Calculating node statistics...');
+        double calculateProgress =
+            _nodeCounter > 0 ? (_calculatedNodes / _nodeCounter) : 0.0;
+        onProgress!(
+            0.9 + (calculateProgress * 0.1), 'Calculating node statistics...');
       }
     }
 
@@ -171,7 +172,12 @@ class MlocateDBParser {
 
     // DEBUG:
     var rootPath = _readNullTerminatedString();
-    rootNode = Node(key: rootPath, label: rootPath, children: [], isDir: true, mlocateIndex: _nodeCounter++);
+    rootNode = Node(
+        key: rootPath,
+        label: rootPath,
+        children: [],
+        isDir: true,
+        mlocateIndex: _nodeCounter++);
     _nodeMap[rootPath] = rootNode!;
 
     _parseConfigurationBlock(configBlockSize);
@@ -209,7 +215,8 @@ class MlocateDBParser {
       if (onProgress != null && iterations % 4096 == 0) {
         try {
           double progress = file.positionSync() / fileSize;
-          onProgress!(progress * 0.9, 'Reading directories...'); // Reserve 10% for calculateCounts
+          onProgress!(progress * 0.9,
+              'Reading directories...'); // Reserve 10% for calculateCounts
         } catch (_) {}
       }
       iterations++;
@@ -218,7 +225,9 @@ class MlocateDBParser {
         if (secBytes.length < 8) break; // EOF reached
 
         var modifiedTimeSeconds = _bytesToInt64(secBytes, endian: Endian.big);
-        var modifiedTime = DateTime.fromMillisecondsSinceEpoch(modifiedTimeSeconds * 1000, isUtc: true);
+        var modifiedTime = DateTime.fromMillisecondsSinceEpoch(
+            modifiedTimeSeconds * 1000,
+            isUtc: true);
 
         file.readSync(4); // dirTimeNanoBytes
         file.readSync(4); // padding
@@ -233,7 +242,13 @@ class MlocateDBParser {
           var parentPath = _getParentPath(dirPath);
           var parentNode = _findNodeByPath(parentPath);
 
-          directoryNode = Node(key: dirPath, label: _getLabel(dirPath), children: [], isDir: true, modifiedTime: modifiedTime, mlocateIndex: _nodeCounter++);
+          directoryNode = Node(
+              key: dirPath,
+              label: _getLabel(dirPath),
+              children: [],
+              isDir: true,
+              modifiedTime: modifiedTime,
+              mlocateIndex: _nodeCounter++);
           _nodeMap[dirPath] = directoryNode;
 
           if (parentNode != null) {
@@ -256,16 +271,21 @@ class MlocateDBParser {
     }
   }
 
-  void _parseDirectoryContents(
-      Node parentNode, String parentPath) {
+  void _parseDirectoryContents(Node parentNode, String parentPath) {
     while (true) {
       var entryType = file.readByteSync();
-      if (entryType == 2 || entryType == -1) break; // End of current directory or EOF
+      if (entryType == 2 || entryType == -1)
+        break; // End of current directory or EOF
 
       var fileName = _readNullTerminatedString();
 
       var fullPath = parentPath == '/' ? '/$fileName' : '$parentPath/$fileName';
-      var entryNode = Node(key: fullPath, label: fileName, children: [], isDir: entryType == 1, mlocateIndex: _nodeCounter++);
+      var entryNode = Node(
+          key: fullPath,
+          label: fileName,
+          children: [],
+          isDir: entryType == 1,
+          mlocateIndex: _nodeCounter++);
       parentNode.children.add(entryNode);
 
       // We do NOT recurse here. The spec says mlocate.db is just a

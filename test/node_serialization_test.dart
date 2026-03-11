@@ -119,14 +119,16 @@ void main() {
 
       final etcNode2 = node2.children.firstWhere((n) => n.label == 'etc');
       expect(etcNode2.children.length, equals(2));
-      expect(etcNode2.children.map((n) => n.label), containsAll(['fstab', 'passwd']));
+      expect(etcNode2.children.map((n) => n.label),
+          containsAll(['fstab', 'passwd']));
 
       final usrNode2 = node2.children.firstWhere((n) => n.label == 'usr');
       expect(usrNode2.children.length, equals(1));
 
       final usrBinNode2 = usrNode2.children.firstWhere((n) => n.label == 'bin');
       expect(usrBinNode2.children.length, equals(2));
-      expect(usrBinNode2.children.map((n) => n.label), containsAll(['bash', 'ls']));
+      expect(usrBinNode2.children.map((n) => n.label),
+          containsAll(['bash', 'ls']));
     });
   });
 }
