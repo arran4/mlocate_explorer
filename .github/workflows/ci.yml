@@ -1,0 +1,367 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*', 'v*.*.*', 'v*.*.*-rc*', 'v*.*.*-beta*', 'test-*']
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, closed]
+    branches: [main, master]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        default: build
+        options: [lint-fix, build, release-major, release-minor, release-patch, release-test, release-rc, release-alpha, monthly-maintenance]
+      release_version_override:
+        type: string
+        default: ''
+      allow_prs:
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: write
+  packages: write
+  security-events: write
+  pages: write
+  id-token: write
+
+jobs:
+  route:
+    name: Event Router
+    runs-on: ubuntu-latest
+    outputs:
+      run_code_checks: ${{ steps.decide.outputs.run_code_checks }}
+      run_release: ${{ steps.decide.outputs.run_release }}
+    steps:
+      - id: decide
+        run: |
+          echo "run_code_checks=true" >> "$GITHUB_OUTPUT"
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "run_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  flutter-analyze-test:
+    name: Flutter analyze/test (fast path)
+    needs: [route]
+    if: ${{ needs.route.outputs.run_code_checks == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter --version
+      - run: flutter pub get
+      - run: dart format --set-exit-if-changed .
+      - run: flutter analyze
+      - run: flutter test
+
+  build-linux:
+    name: Build Linux
+    needs: [route, flutter-analyze-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
+          sudo apt-get install -y ruby ruby-dev rubygems build-essential
+          sudo gem install --no-document fpm
+          sudo apt-get install -y flatpak flatpak-builder
+      - run: flutter pub get
+      - run: flutter build linux --release
+
+      - name: Create Linux zip
+        run: |
+          cd build/linux/*/release/bundle
+          tar -czf ../../../../../mlocate_explorer-linux.tar.gz .
+
+      - name: Build AppImage
+        run: |
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage -O appimagetool
+          chmod +x appimagetool
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+          cp -r build/linux/*/release/bundle/* AppDir/usr/bin/
+
+          cat << 'DESKTOP' > AppDir/usr/share/applications/mlocate_explorer.desktop
+          [Desktop Entry]
+          Type=Application
+          Name=Mlocate Explorer
+          Exec=mlocate_explorer
+          Icon=mlocate_explorer
+          Categories=Utility;
+          DESKTOP
+
+          cp assets/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/mlocate_explorer.png
+          cp assets/icon.png AppDir/mlocate_explorer.png
+          cp AppDir/usr/share/applications/mlocate_explorer.desktop AppDir/
+
+          cat << 'SCRIPT' > AppDir/AppRun
+          #!/bin/sh
+          HERE="$(dirname "\$(readlink -f "\${0}")")"
+          exec "\${HERE}/usr/bin/mlocate_explorer" "$@"
+          SCRIPT
+          chmod +x AppDir/AppRun
+
+          export ARCH=x86_64
+          ./appimagetool AppDir mlocate_explorer-x86_64.AppImage
+
+      - name: Build DEB
+        run: |
+          fpm -s dir -t deb -n mlocate_explorer -v 1.0.0 --prefix /opt/mlocate_explorer build/linux/*/release/bundle/=/opt/mlocate_explorer
+
+      - name: Build RPM
+        run: |
+          sudo apt-get install -y rpm
+          fpm -s dir -t rpm -n mlocate_explorer -v 1.0.0 --prefix /opt/mlocate_explorer build/linux/*/release/bundle/=/opt/mlocate_explorer
+
+      - name: Build Flatpak
+        run: |
+          cat << 'FLATPAK' > mlocate_explorer.flatpak.yml
+          app-id: com.example.mlocate_explorer
+          runtime: org.freedesktop.Platform
+          runtime-version: '22.08'
+          sdk: org.freedesktop.Sdk
+          command: mlocate_explorer
+          modules:
+            - name: mlocate_explorer
+              buildsystem: simple
+              build-commands:
+                - cp -r bundle/* /app/bin/
+              sources:
+                - type: dir
+                  path: build/linux/x64/release/bundle
+                  dest: bundle
+          FLATPAK
+          flatpak-builder build-dir mlocate_explorer.flatpak.yml
+          flatpak build-bundle repo mlocate_explorer.flatpak com.example.mlocate_explorer
+
+      - name: Upload Linux Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-artifacts
+          path: |
+            mlocate_explorer-linux.tar.gz
+            mlocate_explorer-x86_64.AppImage
+            *.deb
+            *.rpm
+            *.flatpak
+
+  build-windows:
+    name: Build Windows
+    needs: [route, flutter-analyze-test]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter build windows --release
+
+      - name: Create Windows zip
+        run: |
+          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath mlocate_explorer-windows.zip
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifacts
+          path: mlocate_explorer-windows.zip
+
+  build-macos:
+    name: Build macOS
+    needs: [route, flutter-analyze-test]
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter build macos --release
+
+      - name: Create macOS zip
+        run: |
+          cd build/macos/Build/Products/Release
+          ditto -c -k --sequesterRsrc --keepParent mlocate_explorer.app ../../../../../mlocate_explorer-macos.zip
+
+      - name: Build DMG
+        run: |
+          npm install -g appdmg
+          appdmg appdmg.json mlocate_explorer.dmg
+
+      - name: Build PKG
+        run: |
+          pkgbuild --component build/macos/Build/Products/Release/mlocate_explorer.app --install-location /Applications mlocate_explorer.pkg
+
+      - name: Upload macOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-artifacts
+          path: |
+            mlocate_explorer-macos.zip
+            mlocate_explorer.dmg
+            mlocate_explorer.pkg
+
+  build-android:
+    name: Build Android
+    needs: [route, flutter-analyze-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter build apk --release
+      - run: flutter build appbundle --release
+
+      - name: Upload Android Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-artifacts
+          path: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/bundle/release/app-release.aab
+
+  build-ios:
+    name: Build iOS
+    needs: [route, flutter-analyze-test]
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+
+      - name: Build unsigned iOS app
+        run: flutter build ios --release --no-codesign
+
+      - name: Zip iOS payload
+        run: |
+          mkdir -p Payload
+          cp -r build/ios/iphoneos/Runner.app Payload/
+          zip -r mlocate_explorer-ios-unsigned.ipa Payload
+
+      # SIGNED PATHWAY (commented out as requested)
+      # - name: Build signed iOS ipa
+      #   run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+      #
+      # - name: Upload signed IPA
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: ios-artifacts-signed
+      #     path: build/ios/ipa/*.ipa
+
+      - name: Upload unsigned iOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-artifacts
+          path: mlocate_explorer-ios-unsigned.ipa
+
+  build-deploy-web:
+    name: Build & Deploy Web
+    needs: [route, flutter-analyze-test]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter build web --release --base-href /mlocate_explorer/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'build/web'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: [route, build-linux, build-windows, build-macos, build-android, build-ios]
+    if: \${{ needs.route.outputs.run_release == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-release
+          merge-multiple: true
+
+      - name: Display structure of downloaded files
+        run: ls -R dist-release
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          files: dist-release/**
+        env:
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+
+  prepare-next-version-pr:
+    name: Prepare next development iteration PR
+    needs: [publish-release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bump to next version and open PR
+        env:
+          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          CURRENT_VERSION=\$(grep 'version: ' pubspec.yaml | sed 's/version: //')
+          BASE_VERSION=\$(echo "\$CURRENT_VERSION" | cut -d '+' -f 1)
+          BUILD_NUM=\$(echo "\$CURRENT_VERSION" | cut -d '+' -f 2)
+
+          MAJOR=\$(echo "\$BASE_VERSION" | cut -d '.' -f 1)
+          MINOR=\$(echo "\$BASE_VERSION" | cut -d '.' -f 2)
+          PATCH=\$(echo "\$BASE_VERSION" | cut -d '.' -f 3)
+
+          NEXT_PATCH=\$((PATCH + 1))
+          NEXT_BUILD=\$((BUILD_NUM + 1))
+
+          NEXT_VERSION="\${MAJOR}.\${MINOR}.\${NEXT_PATCH}+\${NEXT_BUILD}"
+
+          sed -i "s/version: \$CURRENT_VERSION/version: \$NEXT_VERSION/" pubspec.yaml
+
+          BRANCH="bump-version-\$NEXT_VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "\$BRANCH"
+
+          git add pubspec.yaml
+          git commit -m "Prepare next development iteration \$NEXT_VERSION"
+          git push -u origin "$BRANCH"
+          gh pr create --title "Prepare next development iteration $NEXT_VERSION" --body "Automated PR for next iteration after release." --base main --head "$BRANCH"
