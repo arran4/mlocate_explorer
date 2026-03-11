@@ -34,6 +34,14 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
 
   ReceivePort? _receivePort;
 
+  final TextEditingController _pathController = TextEditingController();
+
+  @override
+  void dispose() {
+    _pathController.dispose();
+    super.dispose();
+  }
+
   Future<void> _pickFile() async {
     var result = await FilePicker.platform.pickFiles();
     if (result != null) {
@@ -54,6 +62,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
           if (rootNode != null) {
             _navigationStack.clear();
             _navigationStack.add(rootNode!);
+            _pathController.text = rootNode!.key;
           }
           _isLoading = false;
         });
@@ -79,6 +88,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     if (_navigationStack.length > 1) {
       setState(() {
         _navigationStack.removeLast();
+        _pathController.text = _navigationStack.last.key;
       });
     }
   }
@@ -87,6 +97,60 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     if (node.isDir) {
       setState(() {
         _navigationStack.add(node);
+        _pathController.text = node.key;
+      });
+    }
+  }
+
+  List<Node>? _findStackToPath(Node current, String targetPath, List<Node> currentStack) {
+    currentStack.add(current);
+
+    if (current.key == targetPath) {
+      return currentStack;
+    }
+
+    if (targetPath.startsWith(current.key == '/' ? current.key : '${current.key}/')) {
+      for (final child in current.children) {
+        if (child.isDir) {
+          final result = _findStackToPath(child, targetPath, List.from(currentStack));
+          if (result != null) {
+            return result;
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  void _onPathSubmitted(String submittedPath) {
+    if (rootNode == null) return;
+
+    var path = submittedPath.trim();
+    if (path.isEmpty) {
+       setState(() {
+        _pathController.text = _navigationStack.last.key;
+      });
+      return;
+    }
+    if (path.length > 1 && path.endsWith('/')) {
+      path = path.substring(0, path.length - 1);
+    }
+
+    final newStack = _findStackToPath(rootNode!, path, []);
+
+    if (newStack != null) {
+      setState(() {
+        _navigationStack.clear();
+        _navigationStack.addAll(newStack);
+        _pathController.text = path;
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Path not found or is not a directory: $path')),
+      );
+      setState(() {
+        _pathController.text = _navigationStack.last.key;
       });
     }
   }
@@ -179,9 +243,24 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
           if (currentNode != null)
             Padding(
               padding: const EdgeInsets.all(8.0),
-              child: Text(
-                'Current Path: ${currentNode.key}',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              child: Row(
+                children: [
+                  const Text(
+                    'Current Path: ',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: _pathController,
+                      onSubmitted: _onPathSubmitted,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           Expanded(
