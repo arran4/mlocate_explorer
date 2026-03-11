@@ -21,7 +21,8 @@ void _parseIsolateEntry(Map<String, dynamic> args) {
   });
 }
 
-enum SortOption { nameAsc, nameDesc, typeDirFirst, typeFileFirst }
+enum GroupOption { dirsFirst, filesFirst, none }
+enum SortOption { nameAsc, nameDesc, modifiedAsc, modifiedDesc, mlocateOrder }
 
 class FilePickerScreen extends StatefulWidget {
   const FilePickerScreen({super.key});
@@ -33,7 +34,8 @@ class FilePickerScreen extends StatefulWidget {
 class _FilePickerScreenState extends State<FilePickerScreen> {
   String? filePath;
   String _searchQuery = '';
-  SortOption _sortOption = SortOption.typeDirFirst;
+  GroupOption _groupOption = GroupOption.dirsFirst;
+  SortOption _sortOption = SortOption.nameAsc;
   final TextEditingController _searchController = TextEditingController();
   Node? rootNode;
   bool _isLoading = false;
@@ -323,19 +325,34 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       }).toList();
 
       displayedChildren.sort((a, b) {
+        int groupCompare = 0;
+        if (_groupOption == GroupOption.dirsFirst) {
+          if (a.isDir && !b.isDir) groupCompare = -1;
+          else if (!a.isDir && b.isDir) groupCompare = 1;
+        } else if (_groupOption == GroupOption.filesFirst) {
+          if (a.isDir && !b.isDir) groupCompare = 1;
+          else if (!a.isDir && b.isDir) groupCompare = -1;
+        }
+
+        if (groupCompare != 0) return groupCompare;
+
         switch (_sortOption) {
           case SortOption.nameAsc:
             return a.label.compareTo(b.label);
           case SortOption.nameDesc:
             return b.label.compareTo(a.label);
-          case SortOption.typeDirFirst:
-            if (a.isDir && !b.isDir) return -1;
-            if (!a.isDir && b.isDir) return 1;
-            return a.label.compareTo(b.label);
-          case SortOption.typeFileFirst:
-            if (a.isDir && !b.isDir) return 1;
-            if (!a.isDir && b.isDir) return -1;
-            return a.label.compareTo(b.label);
+          case SortOption.modifiedAsc:
+            final aTime = a.modifiedTime?.millisecondsSinceEpoch ?? 0;
+            final bTime = b.modifiedTime?.millisecondsSinceEpoch ?? 0;
+            if (aTime == bTime) return a.label.compareTo(b.label);
+            return aTime.compareTo(bTime);
+          case SortOption.modifiedDesc:
+            final aTime = a.modifiedTime?.millisecondsSinceEpoch ?? 0;
+            final bTime = b.modifiedTime?.millisecondsSinceEpoch ?? 0;
+            if (aTime == bTime) return a.label.compareTo(b.label);
+            return bTime.compareTo(aTime);
+          case SortOption.mlocateOrder:
+            return a.mlocateIndex.compareTo(b.mlocateIndex);
         }
       });
     }
@@ -438,6 +455,31 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                     ),
                   ),
                   const SizedBox(width: 8.0),
+                  DropdownButton<GroupOption>(
+                    value: _groupOption,
+                    onChanged: (GroupOption? newValue) {
+                      if (newValue != null) {
+                        setState(() {
+                          _groupOption = newValue;
+                        });
+                      }
+                    },
+                    items: const [
+                      DropdownMenuItem(
+                        value: GroupOption.dirsFirst,
+                        child: Text('Dirs First'),
+                      ),
+                      DropdownMenuItem(
+                        value: GroupOption.filesFirst,
+                        child: Text('Files First'),
+                      ),
+                      DropdownMenuItem(
+                        value: GroupOption.none,
+                        child: Text('No Grouping'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 8.0),
                   DropdownButton<SortOption>(
                     value: _sortOption,
                     onChanged: (SortOption? newValue) {
@@ -457,12 +499,16 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                         child: Text('Name (Z-A)'),
                       ),
                       DropdownMenuItem(
-                        value: SortOption.typeDirFirst,
-                        child: Text('Dirs First'),
+                        value: SortOption.modifiedAsc,
+                        child: Text('Modified (Oldest)'),
                       ),
                       DropdownMenuItem(
-                        value: SortOption.typeFileFirst,
-                        child: Text('Files First'),
+                        value: SortOption.modifiedDesc,
+                        child: Text('Modified (Newest)'),
+                      ),
+                      DropdownMenuItem(
+                        value: SortOption.mlocateOrder,
+                        child: Text('mlocate Order'),
                       ),
                     ],
                   ),

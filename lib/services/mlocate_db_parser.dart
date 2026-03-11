@@ -14,6 +14,7 @@ class MlocateDBParser {
   // Maps a full path to its corresponding Node for O(1) lookups
   final Map<String, Node> _nodeMap = {};
   final List<String> errors = [];
+  int _nodeCounter = 0;
 
   MlocateDBParser(this.filePath);
 
@@ -87,7 +88,7 @@ class MlocateDBParser {
 
     // DEBUG:
     var rootPath = _readNullTerminatedString();
-    rootNode = Node(key: rootPath, label: rootPath, children: [], isDir: true);
+    rootNode = Node(key: rootPath, label: rootPath, children: [], isDir: true, mlocateIndex: _nodeCounter++);
     _nodeMap[rootPath] = rootNode!;
 
     _parseConfigurationBlock(configBlockSize);
@@ -140,7 +141,7 @@ class MlocateDBParser {
           var parentPath = _getParentPath(dirPath);
           var parentNode = _findNodeByPath(parentPath);
 
-          directoryNode = Node(key: dirPath, label: _getLabel(dirPath), children: [], isDir: true, modifiedTime: modifiedTime);
+          directoryNode = Node(key: dirPath, label: _getLabel(dirPath), children: [], isDir: true, modifiedTime: modifiedTime, mlocateIndex: _nodeCounter++);
           _nodeMap[dirPath] = directoryNode;
 
           if (parentNode != null) {
@@ -172,7 +173,7 @@ class MlocateDBParser {
       var fileName = _readNullTerminatedString();
 
       var fullPath = parentPath == '/' ? '/$fileName' : '$parentPath/$fileName';
-      var entryNode = Node(key: fullPath, label: fileName, children: [], isDir: entryType == 1);
+      var entryNode = Node(key: fullPath, label: fileName, children: [], isDir: entryType == 1, mlocateIndex: _nodeCounter++);
       parentNode.children.add(entryNode);
 
       // We do NOT recurse here. The spec says mlocate.db is just a

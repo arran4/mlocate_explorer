@@ -10,6 +10,7 @@ class Node {
   int subFolderCount;
   int deepFileCount;
   int deepFolderCount;
+  final int mlocateIndex;
 
   Node({
     required this.key,
@@ -22,5 +23,6 @@ class Node {
     this.subFolderCount = 0,
     this.deepFileCount = 0,
     this.deepFolderCount = 0,
+    this.mlocateIndex = 0,
   });
 }
