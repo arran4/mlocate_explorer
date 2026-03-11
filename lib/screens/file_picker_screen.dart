@@ -49,11 +49,19 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
 
   final TextEditingController _pathController = TextEditingController();
 
+  // Locate state
+  bool _isLocateMode = false;
+  final TextEditingController _locateController = TextEditingController();
+  List<Node> _locateResults = [];
+  bool _isLocating = false;
+  bool _cancelLocateRequested = false;
+
   @override
   void dispose() {
     _pathController.dispose();
     _searchController.dispose();
     _scrollController.dispose();
+    _locateController.dispose();
     super.dispose();
   }
 
@@ -78,7 +86,81 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       _searchController.text = '';
       _pathController.text = '';
       _parseErrors.clear();
+
+      _isLocateMode = false;
+      _locateController.text = '';
+      _locateResults.clear();
     });
+  }
+
+  void _cancelLocate() {
+    setState(() {
+      _cancelLocateRequested = true;
+      _isLocating = false;
+    });
+  }
+
+  Future<void> _performLocate(String query) async {
+    if (rootNode == null) return;
+    if (_isLocating) return;
+
+    query = query.trim().toLowerCase();
+
+    setState(() {
+      _isLocateMode = true;
+      _locateResults.clear();
+      _isLocating = true;
+      _cancelLocateRequested = false;
+    });
+
+    if (query.isEmpty) {
+      setState(() {
+        _isLocating = false;
+      });
+      return;
+    }
+
+    List<Node> results = [];
+    List<Node> queue = [rootNode!];
+    int iterations = 0;
+
+    while (queue.isNotEmpty) {
+      if (_cancelLocateRequested) {
+        break;
+      }
+
+      Node current = queue.removeLast();
+
+      // Basic locate logic: full path contains query string case-insensitively
+      if (current.key.toLowerCase().contains(query)) {
+        results.add(current);
+      }
+
+      // Iterate backwards to process children in correct order when popping from end
+      for (int i = current.children.length - 1; i >= 0; i--) {
+        queue.add(current.children[i]);
+      }
+
+      iterations++;
+      // Yield to the event loop every 10000 iterations to avoid blocking UI thread
+      if (iterations % 10000 == 0) {
+        if (mounted) {
+          setState(() {
+            _locateResults = List.from(results);
+          });
+        }
+        await Future.delayed(Duration.zero);
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        if (!_cancelLocateRequested) {
+          _locateResults = results;
+        }
+        _isLocating = false;
+      });
+    }
   }
 
   void _reloadDatabase() {
@@ -194,6 +276,52 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     }
 
     return null;
+  }
+
+  void _jumpToLocateResult(Node node) {
+    if (rootNode == null) return;
+
+    // Switch out of locate mode
+    setState(() {
+      _isLocateMode = false;
+    });
+
+    // If it's a directory, we can jump straight to it.
+    // If it's a file, we want to jump to its parent directory.
+    String targetPath = node.isDir ? node.key : _getParentPath(node.key);
+
+    // Use the same logic as path submission to jump
+    final newStack = _findStackToPath(rootNode!, targetPath, []);
+
+    if (newStack != null) {
+      setState(() {
+        _navigationStack.clear();
+        _navigationStack.addAll(newStack);
+        _pathController.text = targetPath;
+
+        // Optionally, if jumping to a file, set the search query to highlight/filter it
+        if (!node.isDir) {
+          _searchQuery = node.label;
+          _searchController.text = node.label;
+        } else {
+          _searchQuery = '';
+          _searchController.text = '';
+        }
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.jumpTo(0.0);
+        }
+      });
+    }
+  }
+
+  String _getParentPath(String path) {
+    if (path == '/') return '/';
+    var lastSlash = path.lastIndexOf('/');
+    if (lastSlash == 0) return '/';
+    if (lastSlash == -1) return '/'; // Shouldn't happen for absolute paths
+    return path.substring(0, lastSlash);
   }
 
   void _onPathSubmitted(String submittedPath) {
@@ -350,6 +478,24 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
               )
             : null,
         actions: [
+          if (currentNode != null)
+            IconButton(
+              icon: Icon(_isLocateMode ? Icons.folder : Icons.search_rounded),
+              onPressed: () {
+                if (_isLocating) {
+                  _cancelLocate();
+                } else {
+                  setState(() {
+                    _isLocateMode = !_isLocateMode;
+                    if (!_isLocateMode) {
+                      _locateController.text = '';
+                      _locateResults.clear();
+                    }
+                  });
+                }
+              },
+              tooltip: _isLocateMode ? 'Browse Mode' : 'Locate Search',
+            ),
           if (_parseErrors.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.warning, color: Colors.orange),
@@ -396,27 +542,58 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
           if (currentNode != null)
             Padding(
               padding: const EdgeInsets.all(8.0),
-              child: Row(
-                children: [
-                  const Text(
-                    'Current Path: ',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: _pathController,
-                      onSubmitted: _onPathSubmitted,
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                        border: OutlineInputBorder(),
-                      ),
+              child: _isLocateMode
+                  ? Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _locateController,
+                            onSubmitted: _performLocate,
+                            decoration: InputDecoration(
+                              prefixIcon: const Icon(Icons.search_rounded),
+                              suffixIcon: _isLocating
+                                  ? IconButton(
+                                      icon: const Icon(Icons.close),
+                                      onPressed: _cancelLocate,
+                                      tooltip: 'Cancel Search',
+                                    )
+                                  : null,
+                              hintText: 'Enter locate query...',
+                              isDense: true,
+                              border: const OutlineInputBorder(),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: _isLocating
+                              ? null
+                              : () => _performLocate(_locateController.text),
+                          child: const Text('Locate'),
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        const Text(
+                          'Current Path: ',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        Expanded(
+                          child: TextField(
+                            controller: _pathController,
+                            onSubmitted: _onPathSubmitted,
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
             ),
-          if (currentNode != null && !_isLoading)
+          if (currentNode != null && !_isLoading && !_isLocateMode)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
               child: Row(
@@ -488,12 +665,36 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                           onPressed: _pickFile,
                           child: const Text('Pick mlocate.db File'),
                         )
-                      : ListView.builder(
-                          controller: _scrollController,
-                          itemCount: currentNode.children.length,
-                          itemBuilder: (context, index) {
-                            final node = currentNode.children[index];
-                            final isUnvisitedFolder = node.isDir && !node.isOpened;
+                      : _isLocateMode
+                          ? Column(
+                              children: [
+                                if (_isLocating) const LinearProgressIndicator(),
+                                Expanded(
+                                  child: ListView.builder(
+                                    itemCount: _locateResults.length,
+                                    itemBuilder: (context, index) {
+                                      final node = _locateResults[index];
+                                      return ListTile(
+                                        dense: true,
+                                        visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
+                                        leading: Icon(
+                                          node.isDir ? Icons.folder : Icons.insert_drive_file,
+                                          color: node.isDir ? Colors.blue : Colors.grey,
+                                        ),
+                                        title: Text(node.key),
+                                        onTap: () => _jumpToLocateResult(node),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            )
+                          : ListView.builder(
+                              controller: _scrollController,
+                              itemCount: displayedChildren.length,
+                              itemBuilder: (context, index) {
+                                final node = displayedChildren[index];
+                                final isUnvisitedFolder = node.isDir && !node.isOpened;
                             return GestureDetector(
                               onSecondaryTapDown: (TapDownDetails details) {
                                 showMenu(
