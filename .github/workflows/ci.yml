@@ -196,6 +196,10 @@ jobs:
           flatpak-builder --user --repo=repo --force-clean --install-deps-from=flathub build-dir mlocate_explorer.flatpak.yml
           flatpak build-bundle repo mlocate_explorer.flatpak com.example.mlocate_explorer
 
+      - name: Build Snap
+        uses: snapcore/action-build@v1
+        id: build-snap
+
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -207,6 +211,7 @@ jobs:
             *.rpm
             *.apk
             *.flatpak
+            *.snap
             *.pkg.tar.zst
 
   build-windows:
