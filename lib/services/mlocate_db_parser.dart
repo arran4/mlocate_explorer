@@ -177,7 +177,7 @@ class MlocateDBParser {
   void _parseConfigurationBlock(int configBlockSize) {
     var configBlockData = file.readSync(configBlockSize);
 
-    var configBlock = utf8.decode(configBlockData);
+    var configBlock = utf8.decode(configBlockData, allowMalformed: true);
     var configVariables = configBlock.split('\x00');
 
     var variables = {};
@@ -283,7 +283,7 @@ class MlocateDBParser {
       if (byte == 0) break;
       bytes.add(byte);
     }
-    return utf8.decode(Uint8List.fromList(bytes));
+    return utf8.decode(Uint8List.fromList(bytes), allowMalformed: true);
   }
 
   int _bytesToInt32(Uint8List bytes, {Endian endian = Endian.big}) {
