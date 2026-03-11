@@ -256,6 +256,11 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         _searchController.text = '';
         _pathController.text = node.key;
       });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.jumpTo(0.0);
+        }
+      });
     }
   }
 
@@ -347,6 +352,11 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         _navigationStack.clear();
         _navigationStack.addAll(newStack);
         _pathController.text = path;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.jumpTo(0.0);
+        }
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
