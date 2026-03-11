@@ -34,16 +34,8 @@ void main() {
             isDir: true,
             modifiedTime: DateTime.utc(2023, 2, 1, 0, 0, 0),
             children: [
-              Node(
-                key: '/etc/fstab',
-                label: 'fstab',
-                isDir: false,
-              ),
-              Node(
-                key: '/etc/passwd',
-                label: 'passwd',
-                isDir: false,
-              ),
+              Node(key: '/etc/fstab', label: 'fstab', isDir: false),
+              Node(key: '/etc/passwd', label: 'passwd', isDir: false),
               // adding CJK test folder inside etc
               Node(
                 key: '/etc/测试',
@@ -51,13 +43,9 @@ void main() {
                 isDir: true,
                 modifiedTime: DateTime.utc(2023, 2, 2, 0, 0, 0),
                 children: [
-                  Node(
-                    key: '/etc/测试/文件.txt',
-                    label: '文件.txt',
-                    isDir: false,
-                  )
-                ]
-              )
+                  Node(key: '/etc/测试/文件.txt', label: '文件.txt', isDir: false),
+                ],
+              ),
             ],
           ),
           Node(
@@ -72,11 +60,7 @@ void main() {
                 isDir: true,
                 modifiedTime: DateTime.utc(2023, 4, 1, 0, 0, 0),
                 children: [
-                  Node(
-                    key: '/usr/bin/bash',
-                    label: 'bash',
-                    isDir: false,
-                  ),
+                  Node(key: '/usr/bin/bash', label: 'bash', isDir: false),
                 ],
               ),
             ],
@@ -104,16 +88,28 @@ void main() {
       expect(rootDirs, containsAll(['etc', 'usr']));
 
       final etcNode = parsedRoot.children.firstWhere((e) => e.label == 'etc');
-      expect(etcNode.children.map((e) => e.label).toList(), containsAll(['fstab', 'passwd', '测试']));
-      expect(etcNode.modifiedTime, rootNode.children.firstWhere((e) => e.label == 'etc').modifiedTime);
+      expect(
+        etcNode.children.map((e) => e.label).toList(),
+        containsAll(['fstab', 'passwd', '测试']),
+      );
+      expect(
+        etcNode.modifiedTime,
+        rootNode.children.firstWhere((e) => e.label == 'etc').modifiedTime,
+      );
 
       final cjkFolder = etcNode.children.firstWhere((e) => e.label == '测试');
-      expect(cjkFolder.children.map((e) => e.label).toList(), containsAll(['文件.txt']));
+      expect(
+        cjkFolder.children.map((e) => e.label).toList(),
+        containsAll(['文件.txt']),
+      );
       expect(cjkFolder.isDir, true);
 
       final usrNode = parsedRoot.children.firstWhere((e) => e.label == 'usr');
       final binNode = usrNode.children.firstWhere((e) => e.label == 'bin');
-      expect(binNode.children.map((e) => e.label).toList(), containsAll(['bash']));
+      expect(
+        binNode.children.map((e) => e.label).toList(),
+        containsAll(['bash']),
+      );
     });
   });
 }

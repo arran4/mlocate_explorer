@@ -45,7 +45,8 @@ class Node {
     return Node(
       key: json['key'] as String,
       label: json['label'] as String,
-      children: (json['children'] as List<dynamic>?)
+      children:
+          (json['children'] as List<dynamic>?)
               ?.map((e) => Node.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],

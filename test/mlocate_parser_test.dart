@@ -23,12 +23,7 @@ void main() {
       // 1. Generate a synthetic DB based on mlocate-db.txt spec
       final generator = TestDbGenerator(
         outputPath: dbPath,
-        directories: [
-          '/',
-          '/etc',
-          '/usr',
-          '/usr/bin',
-        ],
+        directories: ['/', '/etc', '/usr', '/usr/bin'],
         directoryContents: {
           '/': ['etc/', 'usr/'],
           '/etc': ['fstab', 'passwd'],
@@ -55,14 +50,16 @@ void main() {
       // Now verify contents of specific directories
 
       // Check /etc
-      final etcNode =
-          parser.rootNode!.children.firstWhere((n) => n.label == 'etc');
+      final etcNode = parser.rootNode!.children.firstWhere(
+        (n) => n.label == 'etc',
+      );
       final etcContents = etcNode.children.map((n) => n.label).toList();
       expect(etcContents, containsAll(['fstab', 'passwd']));
 
       // Check /usr
-      final usrNode =
-          parser.rootNode!.children.firstWhere((n) => n.label == 'usr');
+      final usrNode = parser.rootNode!.children.firstWhere(
+        (n) => n.label == 'usr',
+      );
       expect(usrNode.children.map((n) => n.label), contains('bin'));
 
       // Check /usr/bin
