@@ -1,0 +1,24 @@
+name: mlocate-explorer
+version: "1.0.0+1"
+summary: A mlocate explorer
+description: |
+  A cross-platform graphical user interface (GUI) designed to parse and explore mlocate.db files.
+
+base: core22
+confinement: strict
+grade: stable
+
+apps:
+  mlocate-explorer:
+    command: mlocate_explorer
+    extensions: [gnome]
+    plugs:
+      - home
+      - network
+      - removable-media
+
+parts:
+  mlocate-explorer:
+    source: .
+    plugin: flutter
+    flutter-target: lib/main.dart
