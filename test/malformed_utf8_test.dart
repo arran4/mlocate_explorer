@@ -24,7 +24,7 @@ void main() {
 
       try {
         await raf.writeFrom(Uint8List.fromList('\x00mlocate'.codeUnits));
-        await raf.writeFrom(Uint8List.fromList([0,0,0,0])); // size
+        await raf.writeFrom(Uint8List.fromList([0, 0, 0, 0])); // size
         await raf.writeByte(0);
         await raf.writeByte(0);
         await raf.writeFrom(Uint8List(2));
@@ -56,7 +56,10 @@ void main() {
       expect(parser.errors, isEmpty);
       expect(parser.rootNode, isNotNull);
       expect(parser.rootNode!.children, isNotEmpty);
-      expect(parser.rootNode!.children.first.label.contains('\uFFFD'), isTrue); // Invalid bytes should be replaced with replacement char
+      expect(
+        parser.rootNode!.children.first.label.contains('\uFFFD'),
+        isTrue,
+      ); // Invalid bytes should be replaced with replacement char
     });
   });
 }

@@ -21,7 +21,8 @@ class TestDbGenerator {
     try {
       // 1. Write Header
       await raf.writeFrom(
-          Uint8List.fromList('\x00mlocate'.codeUnits)); // Magic number
+        Uint8List.fromList('\x00mlocate'.codeUnits),
+      ); // Magic number
 
       // Config block size (big endian, 4 bytes)
       final configBlock = _createConfigBlock();
@@ -41,7 +42,8 @@ class TestDbGenerator {
       for (final dir in directories) {
         // Directory Header
         await raf.writeFrom(
-            _int64ToBytes(1672531200)); // dir time sec (arbitrary: 2023-01-01)
+          _int64ToBytes(1672531200),
+        ); // dir time sec (arbitrary: 2023-01-01)
         await raf.writeFrom(_int32ToBytes(0)); // dir time nano (0)
         await raf.writeFrom(Uint8List(4)); // padding (4 bytes)
         await _writeNullTerminatedString(raf, dir); // dir path
@@ -73,8 +75,9 @@ class TestDbGenerator {
     // For test simplicity, we'll keep it very small or empty if possible
     builder.add(utf8.encode('prune_bind_mounts\x001\x00'));
     builder.add(utf8.encode('prunefs\x00NFS\x00'));
-    builder.add(
-        [0]); // Spec: "The value list is terminated by one more NUL character."
+    builder.add([
+      0,
+    ]); // Spec: "The value list is terminated by one more NUL character."
     return builder.toBytes();
   }
 
@@ -93,7 +96,9 @@ class TestDbGenerator {
   }
 
   Future<void> _writeNullTerminatedString(
-      RandomAccessFile raf, String str) async {
+    RandomAccessFile raf,
+    String str,
+  ) async {
     await raf.writeFrom(utf8.encode(str));
     await raf.writeByte(0); // NUL terminator
   }
