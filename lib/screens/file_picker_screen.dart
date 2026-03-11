@@ -47,7 +47,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
 
   ReceivePort? _receivePort;
 
-  List<String> _parseErrors = [];
+  List<Map<String, dynamic>> _parseErrors = [];
 
   final TextEditingController _pathController = TextEditingController();
 
@@ -107,7 +107,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       setState(() {
         if (message is Map<String, dynamic>) {
           rootNode = message['rootNode'] as Node?;
-          _parseErrors = List<String>.from(message['errors'] ?? []);
+          _parseErrors = List<Map<String, dynamic>>.from(message['errors'] ?? []);
         } else {
           rootNode = message as Node?;
           _parseErrors = [];
@@ -282,7 +282,61 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     }
   }
 
+
+  void _showErrorDetails(Map<String, dynamic> error) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Error Details'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Description: ${error['description']}'),
+                Text('Offset: ${error['offset']} (${error['percentage'].toStringAsFixed(2)}%)'),
+                Text('Directory: ${error['directoryPath']}'),
+                const SizedBox(height: 10),
+                const Text('Hex Dump:'),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  color: Colors.grey[200],
+                  child: SelectableText(
+                    error['hexDump'] ?? 'No hex dump available.',
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text:
+                  'Description: ${error['description']}\n'
+                  'Offset: ${error['offset']} (${error['percentage'].toStringAsFixed(2)}%)\n'
+                  'Directory: ${error['directoryPath']}\n\n'
+                  'Hex Dump:\n${error['hexDump']}'
+                ));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Error details copied to clipboard')),
+                );
+              },
+              child: const Text('Copy to Clipboard'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showErrorsDialog() {
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -296,7 +350,23 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
               itemBuilder: (context, index) {
                 return ListTile(
                   leading: const Icon(Icons.error, color: Colors.red),
-                  title: Text(_parseErrors[index]),
+                  title: Text(_parseErrors[index]['description']),
+                  subtitle: Text('Offset: ${_parseErrors[index]['offset']} (${_parseErrors[index]['percentage'].toStringAsFixed(2)}%) in ${_parseErrors[index]['directoryPath']}'),
+                  onTap: () => _showErrorDetails(_parseErrors[index]),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.copy),
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text:
+                        'Description: ${_parseErrors[index]['description']}\n'
+                        'Offset: ${_parseErrors[index]['offset']} (${_parseErrors[index]['percentage'].toStringAsFixed(2)}%)\n'
+                        'Directory: ${_parseErrors[index]['directoryPath']}\n\n'
+                        'Hex Dump:\n${_parseErrors[index]['hexDump']}'
+                      ));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Error details copied to clipboard')),
+                      );
+                    },
+                  ),
                 );
               },
             ),
