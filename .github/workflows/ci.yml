@@ -169,6 +169,10 @@ jobs:
       - name: Build APK
         run: |
           fpm -s dir -t apk -n mlocate_explorer -v 1.0.0 --prefix /opt/mlocate_explorer build/linux/x64/release/bundle/=/opt/mlocate_explorer
+      - name: Build Pacman
+        run: |
+          sudo apt-get install -y libarchive-tools zstd
+          fpm -s dir -t pacman -n mlocate_explorer -v 1.0.0 --prefix /opt/mlocate_explorer build/linux/x64/release/bundle/=/opt/mlocate_explorer
 
       - name: Build Flatpak
         run: |
@@ -203,6 +207,7 @@ jobs:
             *.rpm
             *.apk
             *.flatpak
+            *.pkg.tar.zst
 
   build-windows:
     name: Build Windows
