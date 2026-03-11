@@ -198,7 +198,7 @@ jobs:
           flatpak build-bundle repo mlocate_explorer.flatpak com.example.mlocate_explorer
 
       - name: Clean build directory for Snapcraft
-        run: flutter clean
+        run: rm -rf build/
 
       - name: Build Snap
         uses: snapcore/action-build@v1
