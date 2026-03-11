@@ -197,6 +197,9 @@ jobs:
           flatpak-builder --user --repo=repo --force-clean --install-deps-from=flathub build-dir mlocate_explorer.flatpak.yml
           flatpak build-bundle repo mlocate_explorer.flatpak com.example.mlocate_explorer
 
+      - name: Clean build directory for Snapcraft
+        run: rm -rf build/
+
       - name: Build Snap
         uses: snapcore/action-build@v1
         id: build-snap
