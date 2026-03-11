@@ -166,6 +166,10 @@ jobs:
           sudo apt-get install -y rpm
           fpm -s dir -t rpm -n mlocate_explorer -v 1.0.0 --prefix /opt/mlocate_explorer build/linux/x64/release/bundle/=/opt/mlocate_explorer
 
+      - name: Build APK
+        run: |
+          fpm -s dir -t apk -n mlocate_explorer -v 1.0.0 --prefix /opt/mlocate_explorer build/linux/x64/release/bundle/=/opt/mlocate_explorer
+
       - name: Build Flatpak
         run: |
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
@@ -197,6 +201,7 @@ jobs:
             mlocate_explorer-x86_64.AppImage
             *.deb
             *.rpm
+            *.apk
             *.flatpak
 
   build-windows:
