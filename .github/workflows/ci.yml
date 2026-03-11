@@ -168,10 +168,11 @@ jobs:
 
       - name: Build Flatpak
         run: |
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
           cat << 'FLATPAK' > mlocate_explorer.flatpak.yml
           app-id: com.example.mlocate_explorer
           runtime: org.freedesktop.Platform
-          runtime-version: '22.08'
+          runtime-version: '24.08'
           sdk: org.freedesktop.Sdk
           command: mlocate_explorer
           modules:
@@ -184,7 +185,7 @@ jobs:
                   path: build/linux/x64/release/bundle
                   dest: bundle
           FLATPAK
-          flatpak-builder build-dir mlocate_explorer.flatpak.yml
+          flatpak-builder --repo=repo --force-clean --install-deps-from=flathub build-dir mlocate_explorer.flatpak.yml
           flatpak build-bundle repo mlocate_explorer.flatpak com.example.mlocate_explorer
 
       - name: Upload Linux Artifacts
