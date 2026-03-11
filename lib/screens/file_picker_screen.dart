@@ -44,6 +44,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
   final List<Node> _navigationStack = [];
   final ScrollController _scrollController = ScrollController();
   final Map<String, double> _scrollPositions = {};
+  int _selectedIndex = 0;
 
   ReceivePort? _receivePort;
 
@@ -91,6 +92,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       _searchController.text = '';
       _pathController.text = '';
       _parseErrors.clear();
+      _selectedIndex = 0;
 
       _isLocateMode = false;
       _locateController.text = '';
@@ -116,6 +118,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       _locateResults.clear();
       _isLocating = true;
       _cancelLocateRequested = false;
+      _selectedIndex = 0;
     });
 
     if (query.isEmpty) {
@@ -180,6 +183,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         _isLoading = true;
         _navigationStack.clear();
         _pathController.text = '';
+        _selectedIndex = 0;
       });
       _parseDatabase();
     }
@@ -239,6 +243,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         _searchQuery = '';
         _searchController.text = '';
         _pathController.text = _navigationStack.last.key;
+        _selectedIndex = 0;
       });
 
       final parentNode = _navigationStack.last;
@@ -264,6 +269,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         _searchQuery = '';
         _searchController.text = '';
         _pathController.text = node.key;
+        _selectedIndex = 0;
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
@@ -314,6 +320,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         _navigationStack.clear();
         _navigationStack.addAll(newStack);
         _pathController.text = targetPath;
+        _selectedIndex = 0;
 
         // Optionally, if jumping to a file, set the search query to highlight/filter it
         if (!node.isDir) {
@@ -361,6 +368,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         _navigationStack.clear();
         _navigationStack.addAll(newStack);
         _pathController.text = path;
+        _selectedIndex = 0;
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
@@ -734,6 +742,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                       onChanged: (value) {
                         setState(() {
                           _searchQuery = value;
+                          _selectedIndex = 0;
                         });
                       },
                     ),
@@ -842,13 +851,61 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                 ),
                               ],
                             )
-                          : ListView.builder(
-                              controller: _scrollController,
-                              itemCount: displayedChildren.length,
-                              itemBuilder: (context, index) {
-                                final node = displayedChildren[index];
-                                final isUnvisitedFolder = node.isDir && !node.isOpened;
-                            return GestureDetector(
+                          : Focus(
+                              autofocus: true,
+                              onKeyEvent: (node, event) {
+                                if (event is KeyDownEvent || event is KeyRepeatEvent) {
+                                  if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                                    if (_selectedIndex < displayedChildren.length - 1) {
+                                      setState(() {
+                                        _selectedIndex++;
+                                        _scrollToSelectedIndex();
+                                      });
+                                    }
+                                    return KeyEventResult.handled;
+                                  } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                                    if (HardwareKeyboard.instance.isAltPressed) {
+                                      _navigateUp();
+                                    } else if (_selectedIndex > 0) {
+                                      setState(() {
+                                        _selectedIndex--;
+                                        _scrollToSelectedIndex();
+                                      });
+                                    }
+                                    return KeyEventResult.handled;
+                                  } else if (event.logicalKey == LogicalKeyboardKey.pageDown) {
+                                    if (displayedChildren.isEmpty) return KeyEventResult.ignored;
+                                    setState(() {
+                                      _selectedIndex = (_selectedIndex + 10).clamp(0, displayedChildren.length - 1).toInt();
+                                      _scrollToSelectedIndex();
+                                    });
+                                    return KeyEventResult.handled;
+                                  } else if (event.logicalKey == LogicalKeyboardKey.pageUp) {
+                                    if (displayedChildren.isEmpty) return KeyEventResult.ignored;
+                                    setState(() {
+                                      _selectedIndex = (_selectedIndex - 10).clamp(0, displayedChildren.length - 1).toInt();
+                                      _scrollToSelectedIndex();
+                                    });
+                                    return KeyEventResult.handled;
+                                  } else if (event.logicalKey == LogicalKeyboardKey.backspace) {
+                                    _navigateUp();
+                                    return KeyEventResult.handled;
+                                  } else if (event.logicalKey == LogicalKeyboardKey.enter) {
+                                    if (displayedChildren.isNotEmpty && _selectedIndex >= 0 && _selectedIndex < displayedChildren.length) {
+                                      _navigateTo(displayedChildren[_selectedIndex]);
+                                    }
+                                    return KeyEventResult.handled;
+                                  }
+                                }
+                                return KeyEventResult.ignored;
+                              },
+                              child: ListView.builder(
+                                controller: _scrollController,
+                                itemCount: displayedChildren.length,
+                                itemBuilder: (context, index) {
+                                  final listNode = displayedChildren[index];
+                                  final isUnvisitedFolder = listNode.isDir && !listNode.isOpened;
+                              return GestureDetector(
                               onSecondaryTapDown: (TapDownDetails details) {
                                 showMenu(
                                   context: context,
@@ -861,7 +918,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                   items: [
                                     PopupMenuItem(
                                       value: 'toggle_opened',
-                                      child: Text(node.isOpened ? 'Mark as Unopened' : 'Mark as Opened'),
+                                      child: Text(listNode.isOpened ? 'Mark as Unopened' : 'Mark as Opened'),
                                     ),
                                     const PopupMenuItem(
                                       value: 'copy_path',
@@ -871,10 +928,10 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                 ).then((value) {
                                   if (value == 'toggle_opened') {
                                     setState(() {
-                                      node.isOpened = !node.isOpened;
+                                      listNode.isOpened = !listNode.isOpened;
                                     });
                                   } else if (value == 'copy_path') {
-                                    Clipboard.setData(ClipboardData(text: node.key));
+                                    Clipboard.setData(ClipboardData(text: listNode.key));
                                     if (context.mounted) {
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         const SnackBar(content: Text('Copied path to clipboard')),
@@ -885,13 +942,15 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                               },
                               child: ListTile(
                                 dense: true,
+                                selected: index == _selectedIndex,
+                                selectedTileColor: Colors.blue.withAlpha(25),
                                 visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
                                 leading: Icon(
-                                  node.isDir ? Icons.folder : Icons.insert_drive_file,
-                                  color: node.isDir ? Colors.blue : Colors.grey,
+                                  listNode.isDir ? Icons.folder : Icons.insert_drive_file,
+                                  color: listNode.isDir ? Colors.blue : Colors.grey,
                                 ),
                                 title: Text(
-                                  node.label,
+                                  listNode.label,
                                   style: TextStyle(
                                     fontWeight: isUnvisitedFolder ? FontWeight.bold : FontWeight.normal,
                                   ),
@@ -899,24 +958,50 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    if (node.isDir)
+                                    if (listNode.isDir)
                                       Text(
-                                        'Sub: ${node.subFileCount} files, ${node.subFolderCount} dirs | Deep: ${node.deepFileCount} files, ${node.deepFolderCount} dirs',
+                                        'Sub: ${listNode.subFileCount} files, ${listNode.subFolderCount} dirs | Deep: ${listNode.deepFileCount} files, ${listNode.deepFolderCount} dirs',
                                         style: const TextStyle(fontSize: 12),
                                       ),
-                                    if (node.modifiedTime != null)
-                                      Text('Modified: ${node.modifiedTime!.toLocal().toString()}'),
+                                    if (listNode.modifiedTime != null)
+                                      Text('Modified: ${listNode.modifiedTime!.toLocal().toString()}'),
                                   ],
                                 ),
-                                onTap: () => _navigateTo(node),
+                                onTap: () {
+                                  setState(() {
+                                    _selectedIndex = index;
+                                  });
+                                  _navigateTo(listNode);
+                                },
                               ),
                             );
-                          },
-                        ),
+                                },
+                              ),
+                            ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  void _scrollToSelectedIndex() {
+    if (!_scrollController.hasClients) return;
+
+    // Approximate item height based on ListTile with visualDensity(horizontal: 0, vertical: -4) and dense: true
+    // Standard subtitle with 2 lines is about ~20-25px more. Let's use 50.0 as an approximate average item height.
+    const itemHeight = 56.0;
+
+    final targetOffset = _selectedIndex * itemHeight;
+    final currentOffset = _scrollController.offset;
+    final viewportHeight = _scrollController.position.viewportDimension;
+
+    if (targetOffset < currentOffset) {
+      // Scroll up to show item
+      _scrollController.jumpTo(targetOffset);
+    } else if (targetOffset + itemHeight > currentOffset + viewportHeight) {
+      // Scroll down to show item
+      _scrollController.jumpTo(targetOffset + itemHeight - viewportHeight);
+    }
   }
 }
