@@ -106,9 +106,8 @@ class MlocateDBParser {
     if (onProgress != null) {
       _calculatedNodes++;
       if (_calculatedNodes % 1024 == 0) {
-        double calculateProgress = _nodeCounter > 0
-            ? (_calculatedNodes / _nodeCounter)
-            : 0.0;
+        double calculateProgress =
+            _nodeCounter > 0 ? (_calculatedNodes / _nodeCounter) : 0.0;
         onProgress!(
           0.9 + (calculateProgress * 0.1),
           'Calculating node statistics...',
