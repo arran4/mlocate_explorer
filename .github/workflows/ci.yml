@@ -148,7 +148,7 @@ jobs:
           chmod +x AppDir/AppRun
 
           export ARCH=x86_64
-          ./appimagetool AppDir mlocate_explorer-x86_64.AppImage
+          APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool AppDir mlocate_explorer-x86_64.AppImage
 
       - name: Build DEB
         run: |
