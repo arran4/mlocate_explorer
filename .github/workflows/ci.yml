@@ -90,7 +90,7 @@ jobs:
 
       - name: Build AppImage
         run: |
-          wget -q https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage -O appimagetool
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
           chmod +x appimagetool
           mkdir -p AppDir/usr/bin
           mkdir -p AppDir/usr/share/applications
