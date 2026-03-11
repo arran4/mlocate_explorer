@@ -185,7 +185,7 @@ jobs:
                   path: build/linux/x64/release/bundle
                   dest: bundle
           FLATPAK
-          flatpak-builder --repo=repo --force-clean --install-deps-from=flathub build-dir mlocate_explorer.flatpak.yml
+          flatpak-builder --user --repo=repo --force-clean --install-deps-from=flathub build-dir mlocate_explorer.flatpak.yml
           flatpak build-bundle repo mlocate_explorer.flatpak com.example.mlocate_explorer
 
       - name: Upload Linux Artifacts
