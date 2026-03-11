@@ -17,6 +17,7 @@ class MlocateDBParser {
   int get fileSize => file.lengthSync();
   String _currentDirectoryPath = '/';
   int _nodeCounter = 0;
+  int _calculatedNodes = 0;
 
 
   void _addError(String description) {
@@ -88,7 +89,9 @@ class MlocateDBParser {
     }
   }
 
-  MlocateDBParser(this.filePath);
+  final void Function(double progress, String status)? onProgress;
+
+  MlocateDBParser(this.filePath, {this.onProgress});
 
   void parse() {
     file = File(filePath).openSync();
@@ -101,6 +104,14 @@ class MlocateDBParser {
   }
 
   void _calculateCounts(Node node) {
+    if (onProgress != null) {
+      _calculatedNodes++;
+      if (_calculatedNodes % 1024 == 0) {
+        double calculateProgress = _nodeCounter > 0 ? (_calculatedNodes / _nodeCounter) : 0.0;
+        onProgress!(0.9 + (calculateProgress * 0.1), 'Calculating node statistics...');
+      }
+    }
+
     if (!node.isDir) return;
 
     int subFiles = 0;
@@ -193,7 +204,15 @@ class MlocateDBParser {
   }
 
   void _parseDirectories() {
+    int iterations = 0;
     while (true) {
+      if (onProgress != null && iterations % 4096 == 0) {
+        try {
+          double progress = file.positionSync() / fileSize;
+          onProgress!(progress * 0.9, 'Reading directories...'); // Reserve 10% for calculateCounts
+        } catch (_) {}
+      }
+      iterations++;
       try {
         var secBytes = Uint8List.fromList(file.readSync(8)); // dirTimeSecBytes
         if (secBytes.length < 8) break; // EOF reached

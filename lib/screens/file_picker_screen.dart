@@ -13,9 +13,19 @@ void _parseIsolateEntry(Map<String, dynamic> args) {
   SendPort sendPort = args['sendPort'];
   String filePath = args['filePath'];
 
-  var parser = MlocateDBParser(filePath);
+  var parser = MlocateDBParser(
+    filePath,
+    onProgress: (progress, status) {
+      sendPort.send({
+        'type': 'progress',
+        'progress': progress,
+        'status': status,
+      });
+    },
+  );
   parser.parse();
   sendPort.send({
+    'type': 'done',
     'rootNode': parser.rootNode,
     'errors': parser.errors,
   });
@@ -39,6 +49,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
   final TextEditingController _searchController = TextEditingController();
   Node? rootNode;
   bool _isLoading = false;
+  double? _loadingProgress;
+  String? _loadingStatus;
   Isolate? _isolate;
 
   final List<Node> _navigationStack = [];
@@ -77,6 +89,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       setState(() {
         filePath = result.files.single.path;
         _isLoading = true;
+        _loadingProgress = null;
+        _loadingStatus = 'Opening...';
       });
 
       _parseDatabase();
@@ -181,6 +195,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     if (filePath != null) {
       setState(() {
         _isLoading = true;
+        _loadingProgress = null;
+        _loadingStatus = 'Reloading...';
         _navigationStack.clear();
         _pathController.text = '';
         _selectedIndex = 0;
@@ -199,6 +215,36 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     });
 
     _receivePort!.listen((message) {
+      if (message is Map<String, dynamic>) {
+        if (message['type'] == 'progress') {
+          setState(() {
+            _loadingProgress = message['progress'] as double?;
+            _loadingStatus = message['status'] as String?;
+          });
+          return;
+        } else if (message['type'] == 'done') {
+          setState(() {
+            rootNode = message['rootNode'] as Node?;
+            _parseErrors = List<Map<String, dynamic>>.from(message['errors'] ?? []);
+
+            if (rootNode != null) {
+              _navigationStack.clear();
+              _navigationStack.add(rootNode!);
+              _pathController.text = rootNode!.key;
+            }
+            _isLoading = false;
+            _searchQuery = '';
+            _searchController.text = '';
+          });
+          _receivePort?.close();
+          _receivePort = null;
+          _isolate?.kill(priority: Isolate.immediate);
+          _isolate = null;
+          return;
+        }
+      }
+
+      // Fallback for unexpected messages (shouldn't happen with current protocol)
       setState(() {
         if (message is Map<String, dynamic>) {
           rootNode = message['rootNode'] as Node?;
@@ -561,11 +607,17 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       displayedChildren.sort((a, b) {
         int groupCompare = 0;
         if (_groupOption == GroupOption.dirsFirst) {
-          if (a.isDir && !b.isDir) groupCompare = -1;
-          else if (!a.isDir && b.isDir) groupCompare = 1;
+          if (a.isDir && !b.isDir) {
+            groupCompare = -1;
+          } else if (!a.isDir && b.isDir) {
+            groupCompare = 1;
+          }
         } else if (_groupOption == GroupOption.filesFirst) {
-          if (a.isDir && !b.isDir) groupCompare = 1;
-          else if (!a.isDir && b.isDir) groupCompare = -1;
+          if (a.isDir && !b.isDir) {
+            groupCompare = 1;
+          } else if (!a.isDir && b.isDir) {
+            groupCompare = -1;
+          }
         }
 
         if (groupCompare != 0) return groupCompare;
@@ -814,7 +866,10 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                   ? Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const CircularProgressIndicator(),
+                        CircularProgressIndicator(value: _loadingProgress),
+                        const SizedBox(height: 20),
+                        if (_loadingStatus != null)
+                          Text(_loadingStatus!, style: const TextStyle(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 20),
                         ElevatedButton(
                           onPressed: _cancelLoading,
