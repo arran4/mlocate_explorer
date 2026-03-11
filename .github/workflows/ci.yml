@@ -166,6 +166,14 @@ jobs:
           sudo apt-get install -y rpm
           fpm -s dir -t rpm -n mlocate_explorer -v 1.0.0 --prefix /opt/mlocate_explorer build/linux/x64/release/bundle/=/opt/mlocate_explorer
 
+      - name: Build APK
+        run: |
+          fpm -s dir -t apk -n mlocate_explorer -v 1.0.0 --prefix /opt/mlocate_explorer build/linux/x64/release/bundle/=/opt/mlocate_explorer
+      - name: Build Pacman
+        run: |
+          sudo apt-get install -y libarchive-tools zstd
+          fpm -s dir -t pacman -n mlocate_explorer -v 1.0.0 --prefix /opt/mlocate_explorer build/linux/x64/release/bundle/=/opt/mlocate_explorer
+
       - name: Build Flatpak
         run: |
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
@@ -185,7 +193,7 @@ jobs:
                   path: build/linux/x64/release/bundle
                   dest: bundle
           FLATPAK
-          flatpak-builder --repo=repo --force-clean --install-deps-from=flathub build-dir mlocate_explorer.flatpak.yml
+          flatpak-builder --user --repo=repo --force-clean --install-deps-from=flathub build-dir mlocate_explorer.flatpak.yml
           flatpak build-bundle repo mlocate_explorer.flatpak com.example.mlocate_explorer
 
       - name: Build Snap
@@ -201,8 +209,10 @@ jobs:
             mlocate_explorer-x86_64.AppImage
             *.deb
             *.rpm
+            *.apk
             *.flatpak
             *.snap
+            *.pkg.tar.zst
 
   build-windows:
     name: Build Windows
