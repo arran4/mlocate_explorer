@@ -646,10 +646,24 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('mlocate DB Explorer'),
-        leading: _navigationStack.length > 1
+        leading: _isLocateMode || _navigationStack.length > 1
             ? IconButton(
                 icon: const Icon(Icons.arrow_back),
-                onPressed: _navigateUp,
+                onPressed: () {
+                  if (_isLocateMode) {
+                    if (_isLocating) {
+                      _cancelLocate();
+                    } else {
+                      setState(() {
+                        _isLocateMode = false;
+                        _locateController.text = '';
+                        _locateResults.clear();
+                      });
+                    }
+                  } else {
+                    _navigateUp();
+                  }
+                },
               )
             : null,
         actions: [
