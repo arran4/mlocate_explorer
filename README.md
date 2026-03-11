@@ -18,3 +18,16 @@ To run the application, ensure you have Flutter installed and run:
 ```bash
 flutter run
 ```
+
+
+## Screenshots
+
+Here is a quick look at the application in action:
+
+![mlocate Explorer Demo](assets/demo.gif)
+
+### Exploring Directories
+![Directory View](assets/bin_dir.png)
+
+### Filtering Files
+![Filtering Files](assets/filter.png)
