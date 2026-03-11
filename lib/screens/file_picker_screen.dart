@@ -47,8 +47,6 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
 
   List<String> _parseErrors = [];
 
-  ReceivePort? _receivePort;
-
   final TextEditingController _pathController = TextEditingController();
 
   @override
@@ -67,37 +65,66 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         _isLoading = true;
       });
 
-      _receivePort = ReceivePort();
-      _isolate = await Isolate.spawn(_parseIsolateEntry, {
-        'sendPort': _receivePort!.sendPort,
-        'filePath': filePath!,
-      });
-
-      _receivePort!.listen((message) {
-        setState(() {
-          if (message is Map<String, dynamic>) {
-            rootNode = message['rootNode'] as Node?;
-            _parseErrors = List<String>.from(message['errors'] ?? []);
-          } else {
-            rootNode = message as Node?;
-            _parseErrors = [];
-          }
-
-          if (rootNode != null) {
-            _navigationStack.clear();
-            _navigationStack.add(rootNode!);
-            _pathController.text = rootNode!.key;
-          }
-          _isLoading = false;
-          _searchQuery = '';
-          _searchController.text = '';
-        });
-        _receivePort?.close();
-        _receivePort = null;
-        _isolate?.kill(priority: Isolate.immediate);
-        _isolate = null;
-      });
+      _parseDatabase();
     }
+  }
+
+  void _closeDatabase() {
+    setState(() {
+      rootNode = null;
+      _navigationStack.clear();
+      filePath = null;
+      _searchQuery = '';
+      _searchController.text = '';
+      _pathController.text = '';
+      _parseErrors.clear();
+    });
+  }
+
+  void _reloadDatabase() {
+    if (filePath != null) {
+      setState(() {
+        _isLoading = true;
+        _navigationStack.clear();
+        _pathController.text = '';
+      });
+      _parseDatabase();
+    }
+  }
+
+  Future<void> _parseDatabase() async {
+    if (filePath == null) return;
+
+    _receivePort = ReceivePort();
+    _isolate = await Isolate.spawn(_parseIsolateEntry, {
+      'sendPort': _receivePort!.sendPort,
+      'filePath': filePath!,
+    });
+
+    _receivePort!.listen((message) {
+      setState(() {
+        if (message is Map<String, dynamic>) {
+          rootNode = message['rootNode'] as Node?;
+          _parseErrors = List<String>.from(message['errors'] ?? []);
+        } else {
+          rootNode = message as Node?;
+          _parseErrors = [];
+        }
+
+        if (rootNode != null) {
+          _navigationStack.clear();
+          _navigationStack.add(rootNode!);
+          _pathController.text = rootNode!.key;
+        }
+        _isLoading = false;
+        _searchQuery = '';
+        _searchController.text = '';
+      });
+      _receivePort?.close();
+      _receivePort = null;
+      _isolate?.kill(priority: Isolate.immediate);
+      _isolate = null;
+    });
   }
 
   void _cancelLoading() {
@@ -336,6 +363,10 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                   _exportDirectory(currentNode);
                 } else if (value == 'export_tree') {
                   _exportDirectoryTree(currentNode);
+                } else if (value == 'reload_db') {
+                  _reloadDatabase();
+                } else if (value == 'close_db') {
+                  _closeDatabase();
                 }
               },
               itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
@@ -346,6 +377,15 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                 const PopupMenuItem<String>(
                   value: 'export_tree',
                   child: Text('Export Directory Tree'),
+                ),
+                const PopupMenuDivider(),
+                const PopupMenuItem<String>(
+                  value: 'reload_db',
+                  child: Text('Reload Database'),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'close_db',
+                  child: Text('Close Database'),
                 ),
               ],
             ),
