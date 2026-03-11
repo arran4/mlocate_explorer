@@ -60,7 +60,36 @@ jobs:
           channel: stable
       - run: flutter --version
       - run: flutter pub get
-      - run: dart format --set-exit-if-changed .
+
+      - name: Check formatting
+        id: format
+        run: |
+          dart format .
+          if [[ -n $(git status --porcelain -- '*.dart') ]]; then
+            echo "changes=true" >> "$GITHUB_OUTPUT"
+            git status --porcelain -- '*.dart'
+          else
+            echo "changes=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create PR for formatting fixes
+        if: steps.format.outputs.changes == 'true' && (github.event_name != 'workflow_dispatch' || github.event.inputs.allow_prs != 'false')
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "style: apply dart format"
+          title: "style: apply dart format for ${{ github.head_ref || github.ref_name }}"
+          body: "Automated PR to fix dart formatting issues."
+          branch: "automated/dart-format-${{ github.head_ref || github.ref_name }}"
+          base: ${{ github.head_ref || github.ref_name }}
+          delete-branch: true
+
+      - name: Fail if formatting issues existed
+        if: steps.format.outputs.changes == 'true'
+        run: |
+          echo "Formatting issues detected. A PR has been created (if allowed) with the fixes."
+          exit 1
+
       - run: flutter analyze
       - run: flutter test
 
