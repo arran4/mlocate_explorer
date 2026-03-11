@@ -374,18 +374,54 @@ jobs:
 
   prepare-next-version-pr:
     name: Prepare next development iteration PR
-    needs: [publish-release]
+    needs: [route, publish-release]
+    if: always() && needs.route.outputs.run_release == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - name: Bump to next version and open PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          CURRENT_VERSION=$(grep 'version: ' pubspec.yaml | sed 's/version: //')
-          BASE_VERSION=$(echo "$CURRENT_VERSION" | cut -d '+' -f 1)
-          BUILD_NUM=$(echo "$CURRENT_VERSION" | cut -d '+' -f 2)
+
+          # Fetch tags to ensure we have the latest tag
+          git fetch --tags
+
+          if [[ "${GITHUB_REF_NAME}" == v* ]]; then
+            # Extract the tag version if triggered by a tag
+            TAG_VERSION=${GITHUB_REF_NAME#v}
+          else
+            # Otherwise, use the latest tag (e.g. for workflow_dispatch)
+            LATEST_TAG=$(git describe --tags --abbrev=0)
+            TAG_VERSION=${LATEST_TAG#v}
+          fi
+
+          # Get the current version in pubspec.yaml
+          CURRENT_VERSION=$(grep 'version: ' pubspec.yaml | sed 's/version: //' | tr -d '\r')
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          BRANCH="bump-version-$TAG_VERSION"
+          git checkout -b "$BRANCH"
+
+          # 1. Update pubspec.yaml to match the tag version (remove -next if present)
+          sed -i "s/version: $CURRENT_VERSION/version: $TAG_VERSION/" pubspec.yaml
+          git add pubspec.yaml
+          if ! git diff --cached --quiet; then
+            git commit -m "Release $TAG_VERSION"
+          fi
+
+          # 2. Calculate the next version
+          BASE_VERSION=$(echo "$TAG_VERSION" | cut -d '+' -f 1 | cut -d '-' -f 1)
+          if [[ "$TAG_VERSION" == *"+"* ]]; then
+            BUILD_NUM=$(echo "$TAG_VERSION" | cut -d '+' -f 2)
+          else
+            BUILD_NUM="1"
+          fi
 
           MAJOR=$(echo "$BASE_VERSION" | cut -d '.' -f 1)
           MINOR=$(echo "$BASE_VERSION" | cut -d '.' -f 2)
@@ -394,16 +430,19 @@ jobs:
           NEXT_PATCH=$((PATCH + 1))
           NEXT_BUILD=$((BUILD_NUM + 1))
 
-          NEXT_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}+${NEXT_BUILD}"
+          NEXT_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}-next+${NEXT_BUILD}"
 
-          sed -i "s/version: $CURRENT_VERSION/version: $NEXT_VERSION/" pubspec.yaml
-
-          BRANCH="bump-version-$NEXT_VERSION"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$BRANCH"
-
+          # Update pubspec.yaml to the next version
+          sed -i "s/version: $TAG_VERSION/version: $NEXT_VERSION/" pubspec.yaml
           git add pubspec.yaml
-          git commit -m "Prepare next development iteration $NEXT_VERSION"
-          git push -u origin "$BRANCH"
-          gh pr create --title "Prepare next development iteration $NEXT_VERSION" --body "Automated PR for next iteration after release." --base main --head "$BRANCH"
+          if ! git diff --cached --quiet; then
+            git commit -m "Prepare next development iteration $NEXT_VERSION"
+          fi
+
+          # Push to the new branch and create PR against main
+          if [ $(git rev-list --count HEAD ^main) -gt 0 ]; then
+            git push -u origin "$BRANCH"
+            gh pr create --title "Prepare next development iteration $NEXT_VERSION" --body "Automated PR for next iteration after release." --base main --head "$BRANCH"
+          else
+            echo "No new commits, skipping PR creation."
+          fi
