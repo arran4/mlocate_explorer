@@ -48,7 +48,7 @@ jobs:
           else
             echo "run_build=true" >> "$GITHUB_OUTPUT"
           fi
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+          if [[ "${{ github.ref }}" == refs/tags/v* || ("${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.mode }}" == release*) ]]; then
             echo "run_release=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_release=false" >> "$GITHUB_OUTPUT"
@@ -383,9 +383,21 @@ jobs:
       - name: Display structure of downloaded files
         run: ls -R dist-release
 
+      - uses: actions/checkout@v4
+        if: github.event_name == 'workflow_dispatch'
+
+      - name: Determine tag name
+        id: get_version
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          VERSION=$(grep 'version: ' pubspec.yaml | sed 's/version: //' | tr -d '\r')
+          VERSION=${VERSION%-next*}
+          echo "tag_name=v$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.get_version.outputs.tag_name || github.ref_name }}
           draft: false
           files: dist-release/**
         env:
