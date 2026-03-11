@@ -39,8 +39,11 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
 
   ReceivePort? _receivePort;
 
+  final TextEditingController _pathController = TextEditingController();
+
   @override
   void dispose() {
+    _pathController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -65,6 +68,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
           if (rootNode != null) {
             _navigationStack.clear();
             _navigationStack.add(rootNode!);
+            _pathController.text = rootNode!.key;
           }
           _isLoading = false;
           _searchQuery = '';
@@ -94,6 +98,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         _navigationStack.removeLast();
         _searchQuery = '';
         _searchController.text = '';
+        _pathController.text = _navigationStack.last.key;
       });
     }
   }
@@ -104,6 +109,60 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         _navigationStack.add(node);
         _searchQuery = '';
         _searchController.text = '';
+        _pathController.text = node.key;
+      });
+    }
+  }
+
+  List<Node>? _findStackToPath(Node current, String targetPath, List<Node> currentStack) {
+    currentStack.add(current);
+
+    if (current.key == targetPath) {
+      return currentStack;
+    }
+
+    if (targetPath.startsWith(current.key == '/' ? current.key : '${current.key}/')) {
+      for (final child in current.children) {
+        if (child.isDir) {
+          final result = _findStackToPath(child, targetPath, List.from(currentStack));
+          if (result != null) {
+            return result;
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  void _onPathSubmitted(String submittedPath) {
+    if (rootNode == null) return;
+
+    var path = submittedPath.trim();
+    if (path.isEmpty) {
+       setState(() {
+        _pathController.text = _navigationStack.last.key;
+      });
+      return;
+    }
+    if (path.length > 1 && path.endsWith('/')) {
+      path = path.substring(0, path.length - 1);
+    }
+
+    final newStack = _findStackToPath(rootNode!, path, []);
+
+    if (newStack != null) {
+      setState(() {
+        _navigationStack.clear();
+        _navigationStack.addAll(newStack);
+        _pathController.text = path;
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Path not found or is not a directory: $path')),
+      );
+      setState(() {
+        _pathController.text = _navigationStack.last.key;
       });
     }
   }
@@ -220,9 +279,24 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
           if (currentNode != null)
             Padding(
               padding: const EdgeInsets.all(8.0),
-              child: Text(
-                'Current Path: ${currentNode.key}',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              child: Row(
+                children: [
+                  const Text(
+                    'Current Path: ',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: _pathController,
+                      onSubmitted: _onPathSubmitted,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           if (currentNode != null && !_isLoading)
@@ -302,6 +376,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                           itemBuilder: (context, index) {
                             final node = displayedChildren[index];
                             return ListTile(
+                              dense: true,
+                              visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
                               leading: Icon(
                                 node.isDir ? Icons.folder : Icons.insert_drive_file,
                                 color: node.isDir ? Colors.blue : Colors.grey,
