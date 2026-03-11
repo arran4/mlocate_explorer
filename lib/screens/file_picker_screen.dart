@@ -166,8 +166,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     }
   }
 
-  void _handleKeyEvent(KeyEvent event, List<Node> displayedChildren) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return;
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event, List<Node> displayedChildren) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
 
     final maxIndex = displayedChildren.isEmpty ? 0 : displayedChildren.length - 1;
 
@@ -176,41 +176,50 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         _selectedIndex = (_selectedIndex + 1).clamp(0, maxIndex);
       });
       _scrollToSelectedIndex();
+      return KeyEventResult.handled;
     } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
       setState(() {
         _selectedIndex = (_selectedIndex - 1).clamp(0, maxIndex);
       });
       _scrollToSelectedIndex();
+      return KeyEventResult.handled;
     } else if (event.logicalKey == LogicalKeyboardKey.pageDown) {
       setState(() {
         _selectedIndex = (_selectedIndex + 10).clamp(0, maxIndex);
       });
       _scrollToSelectedIndex();
+      return KeyEventResult.handled;
     } else if (event.logicalKey == LogicalKeyboardKey.pageUp) {
       setState(() {
         _selectedIndex = (_selectedIndex - 10).clamp(0, maxIndex);
       });
       _scrollToSelectedIndex();
+      return KeyEventResult.handled;
     } else if (event.logicalKey == LogicalKeyboardKey.home) {
        setState(() {
         _selectedIndex = 0;
       });
       _scrollToSelectedIndex();
+      return KeyEventResult.handled;
     } else if (event.logicalKey == LogicalKeyboardKey.end) {
        setState(() {
         _selectedIndex = maxIndex;
       });
       _scrollToSelectedIndex();
+      return KeyEventResult.handled;
     } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
                event.logicalKey == LogicalKeyboardKey.backspace ||
                (HardwareKeyboard.instance.isAltPressed && event.logicalKey == LogicalKeyboardKey.arrowUp)) {
       _navigateUp();
+      return KeyEventResult.handled;
     } else if (event.logicalKey == LogicalKeyboardKey.arrowRight || event.logicalKey == LogicalKeyboardKey.enter) {
       if (displayedChildren.isNotEmpty && _selectedIndex >= 0 && _selectedIndex <= maxIndex) {
         final selectedNode = displayedChildren[_selectedIndex];
         _navigateTo(selectedNode);
       }
+      return KeyEventResult.handled;
     }
+    return KeyEventResult.ignored;
   }
 
   void _scrollToSelectedIndex() {
@@ -523,10 +532,10 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                           onPressed: _pickFile,
                           child: const Text('Pick mlocate.db File'),
                         )
-                      : KeyboardListener(
+                      : Focus(
                           focusNode: _listFocusNode,
                           autofocus: true,
-                          onKeyEvent: (event) => _handleKeyEvent(event, displayedChildren),
+                          onKeyEvent: (node, event) => _handleKeyEvent(node, event, displayedChildren),
                           child: ScrollablePositionedList.builder(
                             itemScrollController: _itemScrollController,
                             itemCount: displayedChildren.length,
