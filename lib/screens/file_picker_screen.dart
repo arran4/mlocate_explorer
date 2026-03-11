@@ -542,9 +542,18 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                     fontWeight: isUnvisitedFolder ? FontWeight.bold : FontWeight.normal,
                                   ),
                                 ),
-                                subtitle: node.modifiedTime != null
-                                    ? Text('Modified: ${node.modifiedTime!.toLocal().toString()}')
-                                    : null,
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (node.isDir)
+                                      Text(
+                                        'Sub: ${node.subFileCount} files, ${node.subFolderCount} dirs | Deep: ${node.deepFileCount} files, ${node.deepFolderCount} dirs',
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                    if (node.modifiedTime != null)
+                                      Text('Modified: ${node.modifiedTime!.toLocal().toString()}'),
+                                  ],
+                                ),
                                 onTap: () => _navigateTo(node),
                               ),
                             );

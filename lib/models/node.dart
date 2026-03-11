@@ -6,6 +6,11 @@ class Node {
   DateTime? modifiedTime;
   bool isOpened;
 
+  int subFileCount;
+  int subFolderCount;
+  int deepFileCount;
+  int deepFolderCount;
+
   Node({
     required this.key,
     required this.label,
@@ -13,5 +18,9 @@ class Node {
     this.isDir = false,
     this.modifiedTime,
     this.isOpened = false,
+    this.subFileCount = 0,
+    this.subFolderCount = 0,
+    this.deepFileCount = 0,
+    this.deepFolderCount = 0,
   });
 }
