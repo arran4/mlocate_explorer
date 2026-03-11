@@ -3,6 +3,7 @@ import 'dart:isolate';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 
 import '../models/node.dart';
@@ -39,6 +40,11 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
   Isolate? _isolate;
 
   final List<Node> _navigationStack = [];
+  final ScrollController _scrollController = ScrollController();
+  final Map<String, double> _scrollPositions = {};
+
+  ReceivePort? _receivePort;
+
   List<String> _parseErrors = [];
 
   ReceivePort? _receivePort;
@@ -49,6 +55,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
   void dispose() {
     _pathController.dispose();
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -105,17 +112,33 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
 
   void _navigateUp() {
     if (_navigationStack.length > 1) {
+      final currentNode = _navigationStack.last;
+      _scrollPositions[currentNode.key] = 0.0; // Reset scroll for current node when navigating up
       setState(() {
         _navigationStack.removeLast();
         _searchQuery = '';
         _searchController.text = '';
         _pathController.text = _navigationStack.last.key;
       });
+
+      final parentNode = _navigationStack.last;
+      final savedScrollPosition = _scrollPositions[parentNode.key] ?? 0.0;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.jumpTo(savedScrollPosition);
+        }
+      });
     }
   }
 
   void _navigateTo(Node node) {
     if (node.isDir) {
+      node.isOpened = true;
+      final currentNode = _navigationStack.last;
+      if (_scrollController.hasClients) {
+        _scrollPositions[currentNode.key] = _scrollController.offset;
+      }
       setState(() {
         _navigationStack.add(node);
         _searchQuery = '';
@@ -174,6 +197,11 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       );
       setState(() {
         _pathController.text = _navigationStack.last.key;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.jumpTo(0.0);
+        }
       });
     }
   }
@@ -421,21 +449,64 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                           child: const Text('Pick mlocate.db File'),
                         )
                       : ListView.builder(
-                          itemCount: displayedChildren.length,
+                          controller: _scrollController,
+                          itemCount: currentNode.children.length,
                           itemBuilder: (context, index) {
-                            final node = displayedChildren[index];
-                            return ListTile(
-                              dense: true,
-                              visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
-                              leading: Icon(
-                                node.isDir ? Icons.folder : Icons.insert_drive_file,
-                                color: node.isDir ? Colors.blue : Colors.grey,
+                            final node = currentNode.children[index];
+                            final isUnvisitedFolder = node.isDir && !node.isOpened;
+                            return GestureDetector(
+                              onSecondaryTapDown: (TapDownDetails details) {
+                                showMenu(
+                                  context: context,
+                                  position: RelativeRect.fromLTRB(
+                                    details.globalPosition.dx,
+                                    details.globalPosition.dy,
+                                    details.globalPosition.dx,
+                                    details.globalPosition.dy,
+                                  ),
+                                  items: [
+                                    PopupMenuItem(
+                                      value: 'toggle_opened',
+                                      child: Text(node.isOpened ? 'Mark as Unopened' : 'Mark as Opened'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'copy_path',
+                                      child: Text('Copy Full Path'),
+                                    ),
+                                  ],
+                                ).then((value) {
+                                  if (value == 'toggle_opened') {
+                                    setState(() {
+                                      node.isOpened = !node.isOpened;
+                                    });
+                                  } else if (value == 'copy_path') {
+                                    Clipboard.setData(ClipboardData(text: node.key));
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Copied path to clipboard')),
+                                      );
+                                    }
+                                  }
+                                });
+                              },
+                              child: ListTile(
+                                dense: true,
+                                visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
+                                leading: Icon(
+                                  node.isDir ? Icons.folder : Icons.insert_drive_file,
+                                  color: node.isDir ? Colors.blue : Colors.grey,
+                                ),
+                                title: Text(
+                                  node.label,
+                                  style: TextStyle(
+                                    fontWeight: isUnvisitedFolder ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                ),
+                                subtitle: node.modifiedTime != null
+                                    ? Text('Modified: ${node.modifiedTime!.toLocal().toString()}')
+                                    : null,
+                                onTap: () => _navigateTo(node),
                               ),
-                              title: Text(node.label),
-                              subtitle: node.modifiedTime != null
-                                  ? Text('Modified: ${node.modifiedTime!.toLocal().toString()}')
-                                  : null,
-                              onTap: () => _navigateTo(node),
                             );
                           },
                         ),
