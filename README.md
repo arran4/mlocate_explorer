@@ -26,6 +26,15 @@ Here is a quick look at the application in action:
 
 ![mlocate Explorer Demo](assets/demo.gif)
 
+
+### Mobile Experience
+The application is fully responsive and supports mobile viewports seamlessly.
+<div style="display: flex; flex-direction: row; gap: 10px;">
+  <img src="assets/android_home.png" width="200" alt="Mobile Home" />
+  <img src="assets/android_dir.png" width="200" alt="Mobile Directory" />
+  <img src="assets/android_locate.png" width="200" alt="Mobile Locate Mode" />
+</div>
+
 ### Exploring Directories
 ![Directory View](assets/bin_dir.png)
 
