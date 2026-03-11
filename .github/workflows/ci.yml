@@ -187,6 +187,7 @@ jobs:
             - name: mlocate_explorer
               buildsystem: simple
               build-commands:
+                - mkdir -p /app/bin/
                 - cp -r bundle/* /app/bin/
               sources:
                 - type: dir
