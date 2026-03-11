@@ -106,9 +106,8 @@ class MlocateDBParser {
     if (onProgress != null) {
       _calculatedNodes++;
       if (_calculatedNodes % 1024 == 0) {
-        double calculateProgress = _nodeCounter > 0
-            ? (_calculatedNodes / _nodeCounter)
-            : 0.0;
+        double calculateProgress =
+            _nodeCounter > 0 ? (_calculatedNodes / _nodeCounter) : 0.0;
         onProgress!(
           0.9 + (calculateProgress * 0.1),
           'Calculating node statistics...',
@@ -284,8 +283,9 @@ class MlocateDBParser {
   void _parseDirectoryContents(Node parentNode, String parentPath) {
     while (true) {
       var entryType = file.readByteSync();
-      if (entryType == 2 || entryType == -1)
+      if (entryType == 2 || entryType == -1) {
         break; // End of current directory or EOF
+      }
 
       var fileName = _readNullTerminatedString();
 
