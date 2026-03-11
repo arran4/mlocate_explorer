@@ -54,6 +54,9 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
   // Locate state
   bool _isLocateMode = false;
   final TextEditingController _locateController = TextEditingController();
+
+  // Hidden files toggle
+  bool _showHiddenFiles = false;
   List<Node> _locateResults = [];
   bool _isLocating = false;
   bool _cancelLocateRequested = false;
@@ -132,6 +135,12 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       }
 
       Node current = queue.removeLast();
+
+      if (!_showHiddenFiles && current != rootNode) {
+        if (current.label.isNotEmpty && current.label.startsWith('.') && current.label != '.' && current.label != '..') {
+          continue;
+        }
+      }
 
       // Basic locate logic: full path contains query string case-insensitively
       if (current.key.toLowerCase().contains(query)) {
@@ -382,6 +391,9 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     if (savePath != null) {
       final buffer = StringBuffer();
       for (final child in node.children) {
+        if (!_showHiddenFiles && child.label.startsWith('.') && child.label != '.' && child.label != '..') {
+          continue;
+        }
         buffer.writeln(child.key);
       }
       await File(savePath).writeAsString(buffer.toString());
@@ -394,6 +406,9 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
   }
 
   void _collectTree(Node node, StringBuffer buffer) {
+    if (!_showHiddenFiles && node.label.startsWith('.') && node.label != '.' && node.label != '..') {
+      return;
+    }
     buffer.writeln(node.key);
     for (final child in node.children) {
       _collectTree(child, buffer);
@@ -529,6 +544,9 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     List<Node> displayedChildren = [];
     if (currentNode != null) {
       displayedChildren = currentNode.children.where((node) {
+        if (!_showHiddenFiles && node.label.startsWith('.') && node.label != '.' && node.label != '..') {
+          return false;
+        }
         return node.label.toLowerCase().contains(_searchQuery.toLowerCase());
       }).toList();
 
@@ -610,9 +628,18 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                   _reloadDatabase();
                 } else if (value == 'close_db') {
                   _closeDatabase();
+                } else if (value == 'toggle_hidden') {
+                  setState(() {
+                    _showHiddenFiles = !_showHiddenFiles;
+                  });
                 }
               },
               itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                PopupMenuItem<String>(
+                  value: 'toggle_hidden',
+                  child: Text(_showHiddenFiles ? 'Hide Hidden Files' : 'Show Hidden Files'),
+                ),
+                const PopupMenuDivider(),
                 const PopupMenuItem<String>(
                   value: 'export_dir',
                   child: Text('Export Directory'),
