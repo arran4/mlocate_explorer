@@ -15,8 +15,13 @@ void _parseIsolateEntry(Map<String, dynamic> args) {
 
   var parser = MlocateDBParser(filePath);
   parser.parse();
-  sendPort.send(parser.rootNode);
+  sendPort.send({
+    'rootNode': parser.rootNode,
+    'errors': parser.errors,
+  });
 }
+
+enum SortOption { nameAsc, nameDesc, typeDirFirst, typeFileFirst }
 
 class FilePickerScreen extends StatefulWidget {
   const FilePickerScreen({super.key});
@@ -27,6 +32,9 @@ class FilePickerScreen extends StatefulWidget {
 
 class _FilePickerScreenState extends State<FilePickerScreen> {
   String? filePath;
+  String _searchQuery = '';
+  SortOption _sortOption = SortOption.typeDirFirst;
+  final TextEditingController _searchController = TextEditingController();
   Node? rootNode;
   bool _isLoading = false;
   Isolate? _isolate;
@@ -37,8 +45,16 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
 
   ReceivePort? _receivePort;
 
+  List<String> _parseErrors = [];
+
+  ReceivePort? _receivePort;
+
+  final TextEditingController _pathController = TextEditingController();
+
   @override
   void dispose() {
+    _pathController.dispose();
+    _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -59,12 +75,22 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
 
       _receivePort!.listen((message) {
         setState(() {
-          rootNode = message as Node?;
+          if (message is Map<String, dynamic>) {
+            rootNode = message['rootNode'] as Node?;
+            _parseErrors = List<String>.from(message['errors'] ?? []);
+          } else {
+            rootNode = message as Node?;
+            _parseErrors = [];
+          }
+
           if (rootNode != null) {
             _navigationStack.clear();
             _navigationStack.add(rootNode!);
+            _pathController.text = rootNode!.key;
           }
           _isLoading = false;
+          _searchQuery = '';
+          _searchController.text = '';
         });
         _receivePort?.close();
         _receivePort = null;
@@ -90,6 +116,9 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       _scrollPositions[currentNode.key] = 0.0; // Reset scroll for current node when navigating up
       setState(() {
         _navigationStack.removeLast();
+        _searchQuery = '';
+        _searchController.text = '';
+        _pathController.text = _navigationStack.last.key;
       });
 
       final parentNode = _navigationStack.last;
@@ -112,6 +141,62 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       }
       setState(() {
         _navigationStack.add(node);
+        _searchQuery = '';
+        _searchController.text = '';
+        _pathController.text = node.key;
+      });
+    }
+  }
+
+  List<Node>? _findStackToPath(Node current, String targetPath, List<Node> currentStack) {
+    currentStack.add(current);
+
+    if (current.key == targetPath) {
+      return currentStack;
+    }
+
+    if (targetPath.startsWith(current.key == '/' ? current.key : '${current.key}/')) {
+      for (final child in current.children) {
+        if (child.isDir) {
+          final result = _findStackToPath(child, targetPath, List.from(currentStack));
+          if (result != null) {
+            return result;
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  void _onPathSubmitted(String submittedPath) {
+    if (rootNode == null) return;
+
+    var path = submittedPath.trim();
+    if (path.isEmpty) {
+       setState(() {
+        _pathController.text = _navigationStack.last.key;
+      });
+      return;
+    }
+    if (path.length > 1 && path.endsWith('/')) {
+      path = path.substring(0, path.length - 1);
+    }
+
+    final newStack = _findStackToPath(rootNode!, path, []);
+
+    if (newStack != null) {
+      setState(() {
+        _navigationStack.clear();
+        _navigationStack.addAll(newStack);
+        _pathController.text = path;
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Path not found or is not a directory: $path')),
+      );
+      setState(() {
+        _pathController.text = _navigationStack.last.key;
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
@@ -168,9 +253,65 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     }
   }
 
+  void _showErrorsDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Parsing Errors & Inconsistencies'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _parseErrors.length,
+              itemBuilder: (context, index) {
+                return ListTile(
+                  leading: const Icon(Icons.error, color: Colors.red),
+                  title: Text(_parseErrors[index]),
+                );
+              },
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Close'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentNode = _navigationStack.isNotEmpty ? _navigationStack.last : null;
+
+    List<Node> displayedChildren = [];
+    if (currentNode != null) {
+      displayedChildren = currentNode.children.where((node) {
+        return node.label.toLowerCase().contains(_searchQuery.toLowerCase());
+      }).toList();
+
+      displayedChildren.sort((a, b) {
+        switch (_sortOption) {
+          case SortOption.nameAsc:
+            return a.label.compareTo(b.label);
+          case SortOption.nameDesc:
+            return b.label.compareTo(a.label);
+          case SortOption.typeDirFirst:
+            if (a.isDir && !b.isDir) return -1;
+            if (!a.isDir && b.isDir) return 1;
+            return a.label.compareTo(b.label);
+          case SortOption.typeFileFirst:
+            if (a.isDir && !b.isDir) return 1;
+            if (!a.isDir && b.isDir) return -1;
+            return a.label.compareTo(b.label);
+        }
+      });
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -182,6 +323,12 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
               )
             : null,
         actions: [
+          if (_parseErrors.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.warning, color: Colors.orange),
+              onPressed: _showErrorsDialog,
+              tooltip: 'Show Parsing Errors',
+            ),
           if (currentNode != null)
             PopupMenuButton<String>(
               onSelected: (value) {
@@ -209,9 +356,77 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
           if (currentNode != null)
             Padding(
               padding: const EdgeInsets.all(8.0),
-              child: Text(
-                'Current Path: ${currentNode.key}',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              child: Row(
+                children: [
+                  const Text(
+                    'Current Path: ',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: _pathController,
+                      onSubmitted: _onPathSubmitted,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (currentNode != null && !_isLoading)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.search),
+                        hintText: 'Filter...',
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value;
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8.0),
+                  DropdownButton<SortOption>(
+                    value: _sortOption,
+                    onChanged: (SortOption? newValue) {
+                      if (newValue != null) {
+                        setState(() {
+                          _sortOption = newValue;
+                        });
+                      }
+                    },
+                    items: const [
+                      DropdownMenuItem(
+                        value: SortOption.nameAsc,
+                        child: Text('Name (A-Z)'),
+                      ),
+                      DropdownMenuItem(
+                        value: SortOption.nameDesc,
+                        child: Text('Name (Z-A)'),
+                      ),
+                      DropdownMenuItem(
+                        value: SortOption.typeDirFirst,
+                        child: Text('Dirs First'),
+                      ),
+                      DropdownMenuItem(
+                        value: SortOption.typeFileFirst,
+                        child: Text('Files First'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           Expanded(
@@ -275,6 +490,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                 });
                               },
                               child: ListTile(
+                                dense: true,
+                                visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
                                 leading: Icon(
                                   node.isDir ? Icons.folder : Icons.insert_drive_file,
                                   color: node.isDir ? Colors.blue : Colors.grey,
