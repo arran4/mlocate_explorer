@@ -208,6 +208,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                           itemBuilder: (context, index) {
                             final node = currentNode.children[index];
                             return ListTile(
+                              dense: true,
+                              visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
                               leading: Icon(
                                 node.isDir ? Icons.folder : Icons.insert_drive_file,
                                 color: node.isDir ? Colors.blue : Colors.grey,
