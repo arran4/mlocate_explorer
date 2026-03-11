@@ -21,7 +21,37 @@ class MlocateDBParser {
     file = File(filePath).openSync();
     _parseFileHeader();
     _parseDirectories();
+    if (rootNode != null) {
+      _calculateCounts(rootNode!);
+    }
     file.closeSync();
+  }
+
+  void _calculateCounts(Node node) {
+    if (!node.isDir) return;
+
+    int subFiles = 0;
+    int subFolders = 0;
+    int deepFiles = 0;
+    int deepFolders = 0;
+
+    for (var child in node.children) {
+      if (child.isDir) {
+        subFolders++;
+        deepFolders++;
+        _calculateCounts(child);
+        deepFiles += child.deepFileCount;
+        deepFolders += child.deepFolderCount;
+      } else {
+        subFiles++;
+        deepFiles++;
+      }
+    }
+
+    node.subFileCount = subFiles;
+    node.subFolderCount = subFolders;
+    node.deepFileCount = deepFiles;
+    node.deepFolderCount = deepFolders;
   }
 
   bool compareUint8Lists(Uint8List list1, Uint8List list2) {
