@@ -444,6 +444,8 @@ jobs:
           git add pubspec.yaml
           if ! git diff --cached --quiet; then
             git commit -m "Release $TAG_VERSION"
+            git tag -f "v$TAG_VERSION"
+            git push -f origin "v$TAG_VERSION"
           fi
 
           # 2. Calculate the next version
@@ -472,7 +474,7 @@ jobs:
 
           # Push to the new branch and create PR against main
           if [ $(git rev-list --count HEAD ^main) -gt 0 ]; then
-            git push -u origin "$BRANCH"
+            git push --force -u origin "$BRANCH"
             gh pr create --title "Prepare next development iteration $NEXT_VERSION" --body "Automated PR for next iteration after release." --base main --head "$BRANCH"
           else
             echo "No new commits, skipping PR creation."
