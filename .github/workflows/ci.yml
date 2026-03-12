@@ -2,7 +2,8 @@ name: CI/CD
 
 on:
   push:
-    branches: [main, master] # ordinary pushes
+    branches:
+      - '**'
     tags: ['v*', 'v*.*.*', 'v*.*.*-rc*', 'v*.*.*-beta*', 'test-*']
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, closed]
