@@ -50,8 +50,7 @@ jobs:
           else
             echo "run_build=true" >> "$GITHUB_OUTPUT"
           fi
-
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+          if [[ "${{ github.ref }}" == refs/tags/v* || ("${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.mode }}" == release*) ]]; then
             echo "run_release=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_release=false" >> "$GITHUB_OUTPUT"
@@ -190,14 +189,22 @@ jobs:
             - name: mlocate_explorer
               buildsystem: simple
               build-commands:
+                - mkdir -p /app/bin/
                 - cp -r bundle/* /app/bin/
               sources:
                 - type: dir
                   path: build/linux/x64/release/bundle
                   dest: bundle
           FLATPAK
-          flatpak-builder --repo=repo --force-clean --install-deps-from=flathub build-dir mlocate_explorer.flatpak.yml
+          flatpak-builder --user --repo=repo --force-clean --install-deps-from=flathub build-dir mlocate_explorer.flatpak.yml
           flatpak build-bundle repo mlocate_explorer.flatpak com.example.mlocate_explorer
+
+      - name: Clean build directory for Snapcraft
+        run: rm -rf build/
+
+      - name: Build Snap
+        uses: snapcore/action-build@v1
+        id: build-snap
 
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
@@ -210,6 +217,7 @@ jobs:
             *.rpm
             *.apk
             *.flatpak
+            *.snap
             *.pkg.tar.zst
 
   build-windows:
@@ -377,9 +385,21 @@ jobs:
       - name: Display structure of downloaded files
         run: ls -R dist-release
 
+      - uses: actions/checkout@v4
+        if: github.event_name == 'workflow_dispatch'
+
+      - name: Determine tag name
+        id: get_version
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          VERSION=$(grep 'version: ' pubspec.yaml | sed 's/version: //' | tr -d '\r')
+          VERSION=${VERSION%-next*}
+          echo "tag_name=v$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.get_version.outputs.tag_name || github.ref_name }}
           draft: false
           files: dist-release/**
         env:
@@ -387,18 +407,56 @@ jobs:
 
   prepare-next-version-pr:
     name: Prepare next development iteration PR
-    needs: [publish-release]
+    needs: [route, publish-release]
+    if: always() && needs.route.outputs.run_release == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - name: Bump to next version and open PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          CURRENT_VERSION=$(grep 'version: ' pubspec.yaml | sed 's/version: //')
-          BASE_VERSION=$(echo "$CURRENT_VERSION" | cut -d '+' -f 1)
-          BUILD_NUM=$(echo "$CURRENT_VERSION" | cut -d '+' -f 2)
+
+          # Fetch tags to ensure we have the latest tag
+          git fetch --tags
+
+          if [[ "${GITHUB_REF_NAME}" == v* ]]; then
+            # Extract the tag version if triggered by a tag
+            TAG_VERSION=${GITHUB_REF_NAME#v}
+          else
+            # Otherwise, use the latest tag (e.g. for workflow_dispatch)
+            LATEST_TAG=$(git describe --tags --abbrev=0)
+            TAG_VERSION=${LATEST_TAG#v}
+          fi
+
+          # Get the current version in pubspec.yaml
+          CURRENT_VERSION=$(grep 'version: ' pubspec.yaml | sed 's/version: //' | tr -d '\r')
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          BRANCH="bump-version-$TAG_VERSION"
+          git checkout -b "$BRANCH"
+
+          # 1. Update pubspec.yaml to match the tag version (remove -next if present)
+          sed -i "s/version: $CURRENT_VERSION/version: $TAG_VERSION/" pubspec.yaml
+          git add pubspec.yaml
+          if ! git diff --cached --quiet; then
+            git commit -m "Release $TAG_VERSION"
+            git tag -f "v$TAG_VERSION"
+            git push -f origin "v$TAG_VERSION"
+          fi
+
+          # 2. Calculate the next version
+          BASE_VERSION=$(echo "$TAG_VERSION" | cut -d '+' -f 1 | cut -d '-' -f 1)
+          if [[ "$TAG_VERSION" == *"+"* ]]; then
+            BUILD_NUM=$(echo "$TAG_VERSION" | cut -d '+' -f 2)
+          else
+            BUILD_NUM="1"
+          fi
 
           MAJOR=$(echo "$BASE_VERSION" | cut -d '.' -f 1)
           MINOR=$(echo "$BASE_VERSION" | cut -d '.' -f 2)
@@ -407,16 +465,19 @@ jobs:
           NEXT_PATCH=$((PATCH + 1))
           NEXT_BUILD=$((BUILD_NUM + 1))
 
-          NEXT_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}+${NEXT_BUILD}"
+          NEXT_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}-next+${NEXT_BUILD}"
 
-          sed -i "s/version: $CURRENT_VERSION/version: $NEXT_VERSION/" pubspec.yaml
-
-          BRANCH="bump-version-$NEXT_VERSION"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$BRANCH"
-
+          # Update pubspec.yaml to the next version
+          sed -i "s/version: $TAG_VERSION/version: $NEXT_VERSION/" pubspec.yaml
           git add pubspec.yaml
-          git commit -m "Prepare next development iteration $NEXT_VERSION"
-          git push -u origin "$BRANCH"
-          gh pr create --title "Prepare next development iteration $NEXT_VERSION" --body "Automated PR for next iteration after release." --base main --head "$BRANCH"
+          if ! git diff --cached --quiet; then
+            git commit -m "Prepare next development iteration $NEXT_VERSION"
+          fi
+
+          # Push to the new branch and create PR against main
+          if [ $(git rev-list --count HEAD ^main) -gt 0 ]; then
+            git push --force -u origin "$BRANCH"
+            gh pr create --title "Prepare next development iteration $NEXT_VERSION" --body "Automated PR for next iteration after release." --base main --head "$BRANCH"
+          else
+            echo "No new commits, skipping PR creation."
+          fi
