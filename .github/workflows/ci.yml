@@ -2,6 +2,7 @@ name: CI/CD
 
 on:
   push:
+    branches: [main, master] # ordinary pushes
     tags: ['v*', 'v*.*.*', 'v*.*.*-rc*', 'v*.*.*-beta*', 'test-*']
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, closed]
@@ -42,11 +43,13 @@ jobs:
       - id: decide
         run: |
           echo "run_code_checks=true" >> "$GITHUB_OUTPUT"
+
           if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" != refs/tags/* ]]; then
             echo "run_build=false" >> "$GITHUB_OUTPUT"
           else
             echo "run_build=true" >> "$GITHUB_OUTPUT"
           fi
+
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             echo "run_release=true" >> "$GITHUB_OUTPUT"
           else
