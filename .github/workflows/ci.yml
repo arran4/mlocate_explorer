@@ -64,8 +64,8 @@ jobs:
             echo "run_release=false" >> "$GITHUB_OUTPUT"
           fi
 
-  flutter-analyze-test:
-    name: Flutter analyze/test (fast path)
+  flutter-format:
+    name: Flutter format (fast path)
     needs: [route]
     if: ${{ needs.route.outputs.run_code_checks == 'true' }}
     runs-on: ubuntu-latest
@@ -101,18 +101,43 @@ jobs:
           base: ${{ github.head_ref || github.ref_name }}
           delete-branch: true
 
-      - run: flutter analyze
-      - run: flutter test
-
       - name: Fail if formatting issues existed
         if: steps.format.outputs.changes == 'true'
         run: |
           echo "Formatting issues detected. A PR has been created (if allowed) with the fixes."
           exit 1
 
+  flutter-analyze:
+    name: Flutter analyze (fast path)
+    needs: [route]
+    if: ${{ needs.route.outputs.run_code_checks == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter --version
+      - run: flutter pub get
+      - run: flutter analyze
+
+  flutter-test:
+    name: Flutter test (fast path)
+    needs: [route]
+    if: ${{ needs.route.outputs.run_code_checks == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter --version
+      - run: flutter pub get
+      - run: flutter test
+
   build-linux:
     name: Build Linux
-    needs: [route, flutter-analyze-test]
+    needs: [route, flutter-format, flutter-analyze, flutter-test]
     if: ${{ needs.route.outputs.run_build == 'true' }}
     runs-on: ubuntu-latest
     steps:
@@ -230,7 +255,7 @@ jobs:
 
   build-windows:
     name: Build Windows
-    needs: [route, flutter-analyze-test]
+    needs: [route, flutter-format, flutter-analyze, flutter-test]
     if: ${{ needs.route.outputs.run_build == 'true' }}
     runs-on: windows-latest
     steps:
@@ -253,7 +278,7 @@ jobs:
 
   build-macos:
     name: Build macOS
-    needs: [route, flutter-analyze-test]
+    needs: [route, flutter-format, flutter-analyze, flutter-test]
     if: ${{ needs.route.outputs.run_build == 'true' }}
     runs-on: macos-latest
     steps:
@@ -289,7 +314,7 @@ jobs:
 
   build-android:
     name: Build Android
-    needs: [route, flutter-analyze-test]
+    needs: [route, flutter-format, flutter-analyze, flutter-test]
     if: ${{ needs.route.outputs.run_build == 'true' }}
     runs-on: ubuntu-latest
     steps:
@@ -315,7 +340,7 @@ jobs:
 
   build-ios:
     name: Build iOS
-    needs: [route, flutter-analyze-test]
+    needs: [route, flutter-format, flutter-analyze, flutter-test]
     if: ${{ needs.route.outputs.run_build == 'true' }}
     runs-on: macos-latest
     steps:
@@ -352,7 +377,7 @@ jobs:
 
   build-deploy-web:
     name: Build & Deploy Web
-    needs: [route, flutter-analyze-test]
+    needs: [route, flutter-format, flutter-analyze, flutter-test]
     runs-on: ubuntu-latest
     if: needs.route.outputs.run_release == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
     environment:
