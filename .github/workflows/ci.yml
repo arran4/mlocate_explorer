@@ -243,6 +243,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux-artifacts
+          retention-days: 1
           path: |
             mlocate_explorer-linux.tar.gz
             mlocate_explorer-x86_64.AppImage
@@ -274,6 +275,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-artifacts
+          retention-days: 1
           path: mlocate_explorer-windows.zip
 
   build-macos:
@@ -307,6 +309,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: macos-artifacts
+          retention-days: 1
           path: |
             mlocate_explorer-macos.zip
             mlocate_explorer.dmg
@@ -334,6 +337,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: android-artifacts
+          retention-days: 1
           path: |
             build/app/outputs/flutter-apk/app-release.apk
             build/app/outputs/bundle/release/app-release.aab
@@ -367,12 +371,14 @@ jobs:
       #   uses: actions/upload-artifact@v4
       #   with:
       #     name: ios-artifacts-signed
+      #     retention-days: 1
       #     path: build/ios/ipa/*.ipa
 
       - name: Upload unsigned iOS Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ios-artifacts
+          retention-days: 1
           path: mlocate_explorer-ios-unsigned.ipa
 
   build-deploy-web:
@@ -398,6 +404,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: 'build/web'
+          retention-days: 1
 
       - name: Deploy to GitHub Pages
         id: deployment
