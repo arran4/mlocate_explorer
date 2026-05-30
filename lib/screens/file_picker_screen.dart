@@ -556,13 +556,11 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     final validChildren = _showHiddenFiles
         ? node.children
         : node.children
-              .where(
-                (c) =>
-                    !c.label.startsWith('.') ||
-                    c.label == '.' ||
-                    c.label == '..',
-              )
-              .toList();
+            .where(
+              (c) =>
+                  !c.label.startsWith('.') || c.label == '.' || c.label == '..',
+            )
+            .toList();
 
     for (var i = 0; i < validChildren.length; i++) {
       final child = validChildren[i];
@@ -677,8 +675,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
               onPressed: () {
                 Clipboard.setData(
                   ClipboardData(
-                    text:
-                        'Description: ${error['description']}\n'
+                    text: 'Description: ${error['description']}\n'
                         'Offset: ${error['offset']} (${error['percentage'].toStringAsFixed(2)}%)\n'
                         'Directory: ${error['directoryPath']}\n\n'
                         'Hex Dump:\n${error['hexDump']}',
@@ -759,9 +756,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentNode = _navigationStack.isNotEmpty
-        ? _navigationStack.last
-        : null;
+    final currentNode =
+        _navigationStack.isNotEmpty ? _navigationStack.last : null;
 
     List<Node> displayedChildren = [];
     if (currentNode != null) {
@@ -1079,204 +1075,220 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                       ],
                     )
                   : currentNode == null
-                  ? ElevatedButton(
-                      onPressed: _pickFile,
-                      child: const Text('Pick mlocate.db File'),
-                    )
-                  : _isLocateMode
-                  ? Column(
-                      children: [
-                        if (_isLocating) const LinearProgressIndicator(),
-                        Expanded(
-                          child: ListView.builder(
-                            itemCount: _locateResults.length,
-                            itemBuilder: (context, index) {
-                              final node = _locateResults[index];
-                              return ListTile(
-                                dense: true,
-                                visualDensity: const VisualDensity(
-                                  horizontal: 0,
-                                  vertical: -4,
-                                ),
-                                leading: Icon(
-                                  node.isDir
-                                      ? Icons.folder
-                                      : Icons.insert_drive_file,
-                                  color: node.isDir ? Colors.blue : Colors.grey,
-                                ),
-                                title: Text(node.key),
-                                onTap: () => _jumpToLocateResult(node),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    )
-                  : Focus(
-                      autofocus: true,
-                      onKeyEvent: (node, event) {
-                        if (event is KeyDownEvent || event is KeyRepeatEvent) {
-                          if (event.logicalKey ==
-                              LogicalKeyboardKey.arrowDown) {
-                            if (_selectedIndex < displayedChildren.length - 1) {
-                              setState(() {
-                                _selectedIndex++;
-                                _scrollToSelectedIndex();
-                              });
-                            }
-                            return KeyEventResult.handled;
-                          } else if (event.logicalKey ==
-                              LogicalKeyboardKey.arrowUp) {
-                            if (HardwareKeyboard.instance.isAltPressed) {
-                              _navigateUp();
-                            } else if (_selectedIndex > 0) {
-                              setState(() {
-                                _selectedIndex--;
-                                _scrollToSelectedIndex();
-                              });
-                            }
-                            return KeyEventResult.handled;
-                          } else if (event.logicalKey ==
-                              LogicalKeyboardKey.pageDown) {
-                            if (displayedChildren.isEmpty) {
-                              return KeyEventResult.ignored;
-                            }
-                            setState(() {
-                              _selectedIndex = (_selectedIndex + 10)
-                                  .clamp(0, displayedChildren.length - 1)
-                                  .toInt();
-                              _scrollToSelectedIndex();
-                            });
-                            return KeyEventResult.handled;
-                          } else if (event.logicalKey ==
-                              LogicalKeyboardKey.pageUp) {
-                            if (displayedChildren.isEmpty) {
-                              return KeyEventResult.ignored;
-                            }
-                            setState(() {
-                              _selectedIndex = (_selectedIndex - 10)
-                                  .clamp(0, displayedChildren.length - 1)
-                                  .toInt();
-                              _scrollToSelectedIndex();
-                            });
-                            return KeyEventResult.handled;
-                          } else if (event.logicalKey ==
-                              LogicalKeyboardKey.backspace) {
-                            _navigateUp();
-                            return KeyEventResult.handled;
-                          } else if (event.logicalKey ==
-                              LogicalKeyboardKey.enter) {
-                            if (displayedChildren.isNotEmpty &&
-                                _selectedIndex >= 0 &&
-                                _selectedIndex < displayedChildren.length) {
-                              _navigateTo(displayedChildren[_selectedIndex]);
-                            }
-                            return KeyEventResult.handled;
-                          }
-                        }
-                        return KeyEventResult.ignored;
-                      },
-                      child: ListView.builder(
-                        controller: _scrollController,
-                        itemCount: displayedChildren.length,
-                        itemBuilder: (context, index) {
-                          final listNode = displayedChildren[index];
-                          final isUnvisitedFolder =
-                              listNode.isDir && !listNode.isOpened;
-                          return GestureDetector(
-                            onSecondaryTapDown: (TapDownDetails details) {
-                              showMenu(
-                                context: context,
-                                position: RelativeRect.fromLTRB(
-                                  details.globalPosition.dx,
-                                  details.globalPosition.dy,
-                                  details.globalPosition.dx,
-                                  details.globalPosition.dy,
-                                ),
-                                items: [
-                                  PopupMenuItem(
-                                    value: 'toggle_opened',
-                                    child: Text(
-                                      listNode.isOpened
-                                          ? 'Mark as Unopened'
-                                          : 'Mark as Opened',
-                                    ),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'copy_path',
-                                    child: Text('Copy Full Path'),
-                                  ),
-                                ],
-                              ).then((value) {
-                                if (value == 'toggle_opened') {
-                                  setState(() {
-                                    listNode.isOpened = !listNode.isOpened;
-                                  });
-                                } else if (value == 'copy_path') {
-                                  Clipboard.setData(
-                                    ClipboardData(text: listNode.key),
-                                  );
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Copied path to clipboard',
+                      ? ElevatedButton(
+                          onPressed: _pickFile,
+                          child: const Text('Pick mlocate.db File'),
+                        )
+                      : _isLocateMode
+                          ? Column(
+                              children: [
+                                if (_isLocating)
+                                  const LinearProgressIndicator(),
+                                Expanded(
+                                  child: ListView.builder(
+                                    itemCount: _locateResults.length,
+                                    itemBuilder: (context, index) {
+                                      final node = _locateResults[index];
+                                      return ListTile(
+                                        dense: true,
+                                        visualDensity: const VisualDensity(
+                                          horizontal: 0,
+                                          vertical: -4,
                                         ),
-                                      ),
-                                    );
+                                        leading: Icon(
+                                          node.isDir
+                                              ? Icons.folder
+                                              : Icons.insert_drive_file,
+                                          color: node.isDir
+                                              ? Colors.blue
+                                              : Colors.grey,
+                                        ),
+                                        title: Text(node.key),
+                                        onTap: () => _jumpToLocateResult(node),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Focus(
+                              autofocus: true,
+                              onKeyEvent: (node, event) {
+                                if (event is KeyDownEvent ||
+                                    event is KeyRepeatEvent) {
+                                  if (event.logicalKey ==
+                                      LogicalKeyboardKey.arrowDown) {
+                                    if (_selectedIndex <
+                                        displayedChildren.length - 1) {
+                                      setState(() {
+                                        _selectedIndex++;
+                                        _scrollToSelectedIndex();
+                                      });
+                                    }
+                                    return KeyEventResult.handled;
+                                  } else if (event.logicalKey ==
+                                      LogicalKeyboardKey.arrowUp) {
+                                    if (HardwareKeyboard
+                                        .instance.isAltPressed) {
+                                      _navigateUp();
+                                    } else if (_selectedIndex > 0) {
+                                      setState(() {
+                                        _selectedIndex--;
+                                        _scrollToSelectedIndex();
+                                      });
+                                    }
+                                    return KeyEventResult.handled;
+                                  } else if (event.logicalKey ==
+                                      LogicalKeyboardKey.pageDown) {
+                                    if (displayedChildren.isEmpty) {
+                                      return KeyEventResult.ignored;
+                                    }
+                                    setState(() {
+                                      _selectedIndex = (_selectedIndex + 10)
+                                          .clamp(
+                                              0, displayedChildren.length - 1)
+                                          .toInt();
+                                      _scrollToSelectedIndex();
+                                    });
+                                    return KeyEventResult.handled;
+                                  } else if (event.logicalKey ==
+                                      LogicalKeyboardKey.pageUp) {
+                                    if (displayedChildren.isEmpty) {
+                                      return KeyEventResult.ignored;
+                                    }
+                                    setState(() {
+                                      _selectedIndex = (_selectedIndex - 10)
+                                          .clamp(
+                                              0, displayedChildren.length - 1)
+                                          .toInt();
+                                      _scrollToSelectedIndex();
+                                    });
+                                    return KeyEventResult.handled;
+                                  } else if (event.logicalKey ==
+                                      LogicalKeyboardKey.backspace) {
+                                    _navigateUp();
+                                    return KeyEventResult.handled;
+                                  } else if (event.logicalKey ==
+                                      LogicalKeyboardKey.enter) {
+                                    if (displayedChildren.isNotEmpty &&
+                                        _selectedIndex >= 0 &&
+                                        _selectedIndex <
+                                            displayedChildren.length) {
+                                      _navigateTo(
+                                          displayedChildren[_selectedIndex]);
+                                    }
+                                    return KeyEventResult.handled;
                                   }
                                 }
-                              });
-                            },
-                            child: ListTile(
-                              dense: true,
-                              selected: index == _selectedIndex,
-                              selectedTileColor: Colors.blue.withAlpha(25),
-                              visualDensity: const VisualDensity(
-                                horizontal: 0,
-                                vertical: -4,
-                              ),
-                              leading: Icon(
-                                listNode.isDir
-                                    ? Icons.folder
-                                    : Icons.insert_drive_file,
-                                color: listNode.isDir
-                                    ? Colors.blue
-                                    : Colors.grey,
-                              ),
-                              title: Text(
-                                listNode.label,
-                                style: TextStyle(
-                                  fontWeight: isUnvisitedFolder
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (listNode.isDir)
-                                    Text(
-                                      'Sub: ${listNode.subFileCount} files, ${listNode.subFolderCount} dirs | Deep: ${listNode.deepFileCount} files, ${listNode.deepFolderCount} dirs',
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
-                                  if (listNode.modifiedTime != null)
-                                    Text(
-                                      'Modified: ${listNode.modifiedTime!.toLocal().toString()}',
-                                    ),
-                                ],
-                              ),
-                              onTap: () {
-                                setState(() {
-                                  _selectedIndex = index;
-                                });
-                                _navigateTo(listNode);
+                                return KeyEventResult.ignored;
                               },
+                              child: ListView.builder(
+                                controller: _scrollController,
+                                itemCount: displayedChildren.length,
+                                itemBuilder: (context, index) {
+                                  final listNode = displayedChildren[index];
+                                  final isUnvisitedFolder =
+                                      listNode.isDir && !listNode.isOpened;
+                                  return GestureDetector(
+                                    onSecondaryTapDown:
+                                        (TapDownDetails details) {
+                                      showMenu(
+                                        context: context,
+                                        position: RelativeRect.fromLTRB(
+                                          details.globalPosition.dx,
+                                          details.globalPosition.dy,
+                                          details.globalPosition.dx,
+                                          details.globalPosition.dy,
+                                        ),
+                                        items: [
+                                          PopupMenuItem(
+                                            value: 'toggle_opened',
+                                            child: Text(
+                                              listNode.isOpened
+                                                  ? 'Mark as Unopened'
+                                                  : 'Mark as Opened',
+                                            ),
+                                          ),
+                                          const PopupMenuItem(
+                                            value: 'copy_path',
+                                            child: Text('Copy Full Path'),
+                                          ),
+                                        ],
+                                      ).then((value) {
+                                        if (value == 'toggle_opened') {
+                                          setState(() {
+                                            listNode.isOpened =
+                                                !listNode.isOpened;
+                                          });
+                                        } else if (value == 'copy_path') {
+                                          Clipboard.setData(
+                                            ClipboardData(text: listNode.key),
+                                          );
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Copied path to clipboard',
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      });
+                                    },
+                                    child: ListTile(
+                                      dense: true,
+                                      selected: index == _selectedIndex,
+                                      selectedTileColor:
+                                          Colors.blue.withAlpha(25),
+                                      visualDensity: const VisualDensity(
+                                        horizontal: 0,
+                                        vertical: -4,
+                                      ),
+                                      leading: Icon(
+                                        listNode.isDir
+                                            ? Icons.folder
+                                            : Icons.insert_drive_file,
+                                        color: listNode.isDir
+                                            ? Colors.blue
+                                            : Colors.grey,
+                                      ),
+                                      title: Text(
+                                        listNode.label,
+                                        style: TextStyle(
+                                          fontWeight: isUnvisitedFolder
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                        ),
+                                      ),
+                                      subtitle: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          if (listNode.isDir)
+                                            Text(
+                                              'Sub: ${listNode.subFileCount} files, ${listNode.subFolderCount} dirs | Deep: ${listNode.deepFileCount} files, ${listNode.deepFolderCount} dirs',
+                                              style:
+                                                  const TextStyle(fontSize: 12),
+                                            ),
+                                          if (listNode.modifiedTime != null)
+                                            Text(
+                                              'Modified: ${listNode.modifiedTime!.toLocal().toString()}',
+                                            ),
+                                        ],
+                                      ),
+                                      onTap: () {
+                                        setState(() {
+                                          _selectedIndex = index;
+                                        });
+                                        _navigateTo(listNode);
+                                      },
+                                    ),
+                                  );
+                                },
+                              ),
                             ),
-                          );
-                        },
-                      ),
-                    ),
             ),
           ),
         ],
