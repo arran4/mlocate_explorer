@@ -502,13 +502,30 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
 
     if (savePath != null) {
       if (format == 'json') {
-        final Map<String, dynamic> data = node.toJson();
-        if (!_showHiddenFiles) {
-          data['children'] = (data['children'] as List).where((child) {
-            final label = child['label'] as String;
-            return !label.startsWith('.') || label == '.' || label == '..';
-          }).toList();
+        Map<String, dynamic> toMapFlat(Node n) {
+          return {
+            'key': n.key,
+            'label': n.label,
+            'isDir': n.isDir,
+            'modifiedTime': n.modifiedTime?.toIso8601String(),
+            'isOpened': n.isOpened,
+            'subFileCount': n.subFileCount,
+            'subFolderCount': n.subFolderCount,
+            'deepFileCount': n.deepFileCount,
+            'deepFolderCount': n.deepFolderCount,
+            'children': const <Map<String, dynamic>>[],
+          };
         }
+
+        final Map<String, dynamic> data = toMapFlat(node);
+        data['children'] = node.children
+            .where((child) {
+              if (_showHiddenFiles) return true;
+              final label = child.label;
+              return !label.startsWith('.') || label == '.' || label == '..';
+            })
+            .map(toMapFlat)
+            .toList();
         await File(savePath).writeAsString(jsonEncode(data));
       } else {
         final buffer = StringBuffer();
@@ -590,22 +607,32 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
 
     if (savePath != null) {
       if (format == 'json') {
-        dynamic cleanJson(Map<String, dynamic> jsonNode) {
-          if (!_showHiddenFiles) {
-            final children = (jsonNode['children'] as List).where((child) {
-              final label = child['label'] as String;
-              return !label.startsWith('.') || label == '.' || label == '..';
-            }).toList();
-            jsonNode['children'] = children.map((c) => cleanJson(c)).toList();
-          } else {
-            jsonNode['children'] = (jsonNode['children'] as List)
-                .map((c) => cleanJson(c))
-                .toList();
+        Map<String, dynamic> serializeNode(Node n) {
+          final childrenList = <Map<String, dynamic>>[];
+          for (final child in n.children) {
+            if (!_showHiddenFiles &&
+                child.label.startsWith('.') &&
+                child.label != '.' &&
+                child.label != '..') {
+              continue;
+            }
+            childrenList.add(serializeNode(child));
           }
-          return jsonNode;
+          return {
+            'key': n.key,
+            'label': n.label,
+            'isDir': n.isDir,
+            'modifiedTime': n.modifiedTime?.toIso8601String(),
+            'isOpened': n.isOpened,
+            'subFileCount': n.subFileCount,
+            'subFolderCount': n.subFolderCount,
+            'deepFileCount': n.deepFileCount,
+            'deepFolderCount': n.deepFolderCount,
+            'children': childrenList,
+          };
         }
 
-        final Map<String, dynamic> data = cleanJson(node.toJson());
+        final Map<String, dynamic> data = serializeNode(node);
         await File(savePath).writeAsString(jsonEncode(data));
       } else {
         final buffer = StringBuffer();
