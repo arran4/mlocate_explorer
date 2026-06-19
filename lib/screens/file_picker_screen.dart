@@ -1386,7 +1386,7 @@ class _NodeSubtitleState extends State<_NodeSubtitle> {
   @override
   Widget build(BuildContext context) {
     final node = widget.node;
-    final timeToDisplay = node.modifiedTime ?? _stat?.modified;
+    final timeToDisplay = node.modifiedTime;
     final sizeToDisplay = _stat?.size;
 
     return Column(
