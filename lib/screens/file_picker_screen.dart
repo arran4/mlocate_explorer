@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:isolate';
 
 import 'dart:io';
@@ -455,29 +456,137 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     }
   }
 
+  Future<String?> _showExportFormatDialog(bool isTree) async {
+    return showDialog<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Select Export Format'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text('Raw Paths'),
+                subtitle: const Text('A flat list of file paths'),
+                onTap: () => Navigator.of(context).pop('raw'),
+              ),
+              if (!isTree)
+                ListTile(
+                  title: const Text('ls-like'),
+                  subtitle: const Text('A basic list of file names'),
+                  onTap: () => Navigator.of(context).pop('ls'),
+                ),
+              if (isTree)
+                ListTile(
+                  title: const Text('ASCII Tree'),
+                  subtitle: const Text('A visual tree representation'),
+                  onTap: () => Navigator.of(context).pop('ascii'),
+                ),
+              ListTile(
+                title: const Text('JSON'),
+                subtitle: const Text('Structured JSON data'),
+                onTap: () => Navigator.of(context).pop('json'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _exportDirectory(Node node) async {
+    final format = await _showExportFormatDialog(false);
+    if (format == null) {
+      return;
+    }
+
+    final ext = format == 'json' ? 'json' : 'txt';
     final savePath = await FilePicker.platform.saveFile(
       dialogTitle: 'Export Directory',
-      fileName: 'directory_export.txt',
+      fileName: 'directory_export.$ext',
     );
 
     if (savePath != null) {
-      final buffer = StringBuffer();
-      for (final child in node.children) {
-        if (!_showHiddenFiles &&
-            child.label.startsWith('.') &&
-            child.label != '.' &&
-            child.label != '..') {
-          continue;
+      if (format == 'json') {
+        Map<String, dynamic> toMapFlat(Node n) {
+          return {
+            'key': n.key,
+            'label': n.label,
+            'isDir': n.isDir,
+            'modifiedTime': n.modifiedTime?.toIso8601String(),
+            'isOpened': n.isOpened,
+            'subFileCount': n.subFileCount,
+            'subFolderCount': n.subFolderCount,
+            'deepFileCount': n.deepFileCount,
+            'deepFolderCount': n.deepFolderCount,
+            'children': const <Map<String, dynamic>>[],
+          };
         }
-        buffer.writeln(child.key);
+
+        final Map<String, dynamic> data = toMapFlat(node);
+        data['children'] = node.children
+            .where((child) {
+              if (_showHiddenFiles) return true;
+              final label = child.label;
+              return !label.startsWith('.') || label == '.' || label == '..';
+            })
+            .map(toMapFlat)
+            .toList();
+        await File(savePath).writeAsString(jsonEncode(data));
+      } else {
+        final buffer = StringBuffer();
+        for (final child in node.children) {
+          if (!_showHiddenFiles &&
+              child.label.startsWith('.') &&
+              child.label != '.' &&
+              child.label != '..') {
+            continue;
+          }
+          if (format == 'ls') {
+            buffer.writeln(child.label + (child.isDir ? '/' : ''));
+          } else {
+            buffer.writeln(child.key);
+          }
+        }
+        await File(savePath).writeAsString(buffer.toString());
       }
-      await File(savePath).writeAsString(buffer.toString());
       if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Exported to $savePath')));
       }
+    }
+  }
+
+  void _collectTreeAscii(
+      Node node, StringBuffer buffer, String prefix, bool isTail, bool isRoot) {
+    if (!_showHiddenFiles &&
+        node.label.startsWith('.') &&
+        node.label != '.' &&
+        node.label != '..') {
+      return;
+    }
+
+    if (isRoot) {
+      buffer.writeln(node.label);
+    } else {
+      buffer.write(prefix);
+      buffer.write(isTail ? '└── ' : '├── ');
+      buffer.writeln(node.label);
+    }
+
+    final validChildren = _showHiddenFiles
+        ? node.children
+        : node.children
+            .where((c) =>
+                !c.label.startsWith('.') || c.label == '.' || c.label == '..')
+            .toList();
+
+    for (var i = 0; i < validChildren.length; i++) {
+      final child = validChildren[i];
+      final isLast = i == validChildren.length - 1;
+      _collectTreeAscii(child, buffer,
+          isRoot ? prefix : prefix + (isTail ? '    ' : '│   '), isLast, false);
     }
   }
 
@@ -495,17 +604,57 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
   }
 
   Future<void> _exportDirectoryTree(Node node) async {
+    final format = await _showExportFormatDialog(true);
+    if (format == null) {
+      return;
+    }
+
+    final ext = format == 'json' ? 'json' : 'txt';
     final savePath = await FilePicker.platform.saveFile(
       dialogTitle: 'Export Directory Tree',
-      fileName: 'directory_tree_export.txt',
+      fileName: 'directory_tree_export.$ext',
     );
 
     if (savePath != null) {
-      final buffer = StringBuffer();
-      for (final child in node.children) {
-        _collectTree(child, buffer);
+      if (format == 'json') {
+        Map<String, dynamic> serializeNode(Node n) {
+          final childrenList = <Map<String, dynamic>>[];
+          for (final child in n.children) {
+            if (!_showHiddenFiles &&
+                child.label.startsWith('.') &&
+                child.label != '.' &&
+                child.label != '..') {
+              continue;
+            }
+            childrenList.add(serializeNode(child));
+          }
+          return {
+            'key': n.key,
+            'label': n.label,
+            'isDir': n.isDir,
+            'modifiedTime': n.modifiedTime?.toIso8601String(),
+            'isOpened': n.isOpened,
+            'subFileCount': n.subFileCount,
+            'subFolderCount': n.subFolderCount,
+            'deepFileCount': n.deepFileCount,
+            'deepFolderCount': n.deepFolderCount,
+            'children': childrenList,
+          };
+        }
+
+        final Map<String, dynamic> data = serializeNode(node);
+        await File(savePath).writeAsString(jsonEncode(data));
+      } else {
+        final buffer = StringBuffer();
+        if (format == 'ascii') {
+          _collectTreeAscii(node, buffer, "", true, true);
+        } else {
+          for (final child in node.children) {
+            _collectTree(child, buffer);
+          }
+        }
+        await File(savePath).writeAsString(buffer.toString());
       }
-      await File(savePath).writeAsString(buffer.toString());
       if (mounted) {
         ScaffoldMessenger.of(
           context,
