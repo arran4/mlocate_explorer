@@ -1368,9 +1368,15 @@ class _NodeSubtitleState extends State<_NodeSubtitle> {
   }
 
   String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    if (bytes < 1024) {
+      return '$bytes B';
+    }
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    }
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 
@@ -1389,9 +1395,11 @@ class _NodeSubtitleState extends State<_NodeSubtitle> {
             style: const TextStyle(fontSize: 12),
           ),
         if (timeToDisplay != null)
-          Text('Modified: ${timeToDisplay.toLocal().toString()}', style: const TextStyle(fontSize: 12)),
+          Text('Modified: ${timeToDisplay.toLocal().toString()}',
+              style: const TextStyle(fontSize: 12)),
         if (sizeToDisplay != null && !node.isDir)
-          Text('Size: ${_formatBytes(sizeToDisplay)}', style: const TextStyle(fontSize: 12)),
+          Text('Size: ${_formatBytes(sizeToDisplay)}',
+              style: const TextStyle(fontSize: 12)),
       ],
     );
   }
