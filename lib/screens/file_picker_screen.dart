@@ -1129,6 +1129,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                               : Colors.grey,
                                         ),
                                         title: Text(node.key),
+                                        subtitle: _NodeSubtitle(node: node),
                                         onTap: () => _jumpToLocateResult(node),
                                       );
                                     },
@@ -1287,22 +1288,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                               : FontWeight.normal,
                                         ),
                                       ),
-                                      subtitle: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          if (listNode.isDir)
-                                            Text(
-                                              'Sub: ${listNode.subFileCount} files, ${listNode.subFolderCount} dirs | Deep: ${listNode.deepFileCount} files, ${listNode.deepFolderCount} dirs',
-                                              style:
-                                                  const TextStyle(fontSize: 12),
-                                            ),
-                                          if (listNode.modifiedTime != null)
-                                            Text(
-                                              'Modified: ${listNode.modifiedTime!.toLocal().toString()}',
-                                            ),
-                                        ],
-                                      ),
+                                      subtitle: _NodeSubtitle(node: listNode),
                                       onTap: () {
                                         setState(() {
                                           _selectedIndex = index;
@@ -1339,5 +1325,74 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       // Scroll down to show item
       _scrollController.jumpTo(targetOffset + itemHeight - viewportHeight);
     }
+  }
+}
+
+class _NodeSubtitle extends StatefulWidget {
+  final Node node;
+
+  const _NodeSubtitle({required this.node});
+
+  @override
+  _NodeSubtitleState createState() => _NodeSubtitleState();
+}
+
+class _NodeSubtitleState extends State<_NodeSubtitle> {
+  FileStat? _stat;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchStat();
+  }
+
+  @override
+  void didUpdateWidget(_NodeSubtitle oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.node.key != widget.node.key) {
+      _fetchStat();
+    }
+  }
+
+  void _fetchStat() {
+    _stat = null;
+    FileStat.stat(widget.node.key).then((stat) {
+      if (mounted) {
+        setState(() {
+          _stat = stat;
+        });
+      }
+    }).catchError((_) {
+      // Ignore errors silently
+    });
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final node = widget.node;
+    final timeToDisplay = node.modifiedTime ?? _stat?.modified;
+    final sizeToDisplay = _stat?.size;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (node.isDir)
+          Text(
+            'Sub: ${node.subFileCount} files, ${node.subFolderCount} dirs | Deep: ${node.deepFileCount} files, ${node.deepFolderCount} dirs',
+            style: const TextStyle(fontSize: 12),
+          ),
+        if (timeToDisplay != null)
+          Text('Modified: ${timeToDisplay.toLocal().toString()}', style: const TextStyle(fontSize: 12)),
+        if (sizeToDisplay != null && !node.isDir)
+          Text('Size: ${_formatBytes(sizeToDisplay)}', style: const TextStyle(fontSize: 12)),
+      ],
+    );
   }
 }
