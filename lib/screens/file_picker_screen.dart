@@ -470,6 +470,12 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                 subtitle: const Text('A flat list of file paths'),
                 onTap: () => Navigator.of(context).pop('raw'),
               ),
+              if (!isTree)
+                ListTile(
+                  title: const Text('ls-like'),
+                  subtitle: const Text('A basic list of file names'),
+                  onTap: () => Navigator.of(context).pop('ls'),
+                ),
               if (isTree)
                 ListTile(
                   title: const Text('ASCII Tree'),
@@ -536,7 +542,11 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
               child.label != '..') {
             continue;
           }
-          buffer.writeln(child.key);
+          if (format == 'ls') {
+            buffer.writeln(child.label + (child.isDir ? '/' : ''));
+          } else {
+            buffer.writeln(child.key);
+          }
         }
         await File(savePath).writeAsString(buffer.toString());
       }
