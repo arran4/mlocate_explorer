@@ -1356,10 +1356,13 @@ class _NodeSubtitleState extends State<_NodeSubtitle> {
 
   void _fetchStat() {
     _stat = null;
-    FileStat.stat(widget.node.key).then((stat) {
-      if (mounted) {
+    final currentKey = widget.node.key;
+    FileStat.stat(currentKey).then((stat) {
+      if (mounted && widget.node.key == currentKey) {
         setState(() {
-          _stat = stat;
+          if (stat.type != FileSystemEntityType.notFound) {
+            _stat = stat;
+          }
         });
       }
     }).catchError((_) {
