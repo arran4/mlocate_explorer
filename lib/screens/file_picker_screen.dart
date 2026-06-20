@@ -796,7 +796,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
             node.label != '..';
       }).length;
 
-      effectivelyShowHidden = _showHiddenFiles || _localShowHiddenFolders.contains(currentNode.key);
+      effectivelyShowHidden =
+          _showHiddenFiles || _localShowHiddenFolders.contains(currentNode.key);
 
       displayedChildren = currentNode.children.where((node) {
         if (!effectivelyShowHidden &&
@@ -1159,8 +1160,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                     event is KeyRepeatEvent) {
                                   if (event.logicalKey ==
                                       LogicalKeyboardKey.arrowDown) {
-                                    if (_selectedIndex <
-                                        totalItems - 1) {
+                                    if (_selectedIndex < totalItems - 1) {
                                       setState(() {
                                         _selectedIndex++;
                                         _scrollToSelectedIndex();
@@ -1186,8 +1186,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                     }
                                     setState(() {
                                       _selectedIndex = (_selectedIndex + 10)
-                                          .clamp(
-                                              0, totalItems - 1)
+                                          .clamp(0, totalItems - 1)
                                           .toInt();
                                       _scrollToSelectedIndex();
                                     });
@@ -1199,8 +1198,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                     }
                                     setState(() {
                                       _selectedIndex = (_selectedIndex - 10)
-                                          .clamp(
-                                              0, totalItems - 1)
+                                          .clamp(0, totalItems - 1)
                                           .toInt();
                                       _scrollToSelectedIndex();
                                     });
@@ -1213,20 +1211,26 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                       LogicalKeyboardKey.enter) {
                                     if (totalItems > 0 &&
                                         _selectedIndex >= 0 &&
-                                        _selectedIndex <
-                                            totalItems) {
-                                      if (_selectedIndex < displayedChildren.length) {
-                                        _navigateTo(displayedChildren[_selectedIndex]);
+                                        _selectedIndex < totalItems) {
+                                      if (_selectedIndex <
+                                          displayedChildren.length) {
+                                        _navigateTo(
+                                            displayedChildren[_selectedIndex]);
                                       } else if (showHiddenToggleItem) {
                                         setState(() {
-                                          if (_localShowHiddenFolders.contains(currentNode.key)) {
-                                            _localShowHiddenFolders.remove(currentNode.key);
+                                          if (_localShowHiddenFolders
+                                              .contains(currentNode.key)) {
+                                            _localShowHiddenFolders
+                                                .remove(currentNode.key);
                                             // Optional: Clamp selected index when hiding locally
-                                            if (_selectedIndex >= totalItems - 1) {
-                                              _selectedIndex = (totalItems - 2).clamp(0, totalItems - 1);
+                                            if (_selectedIndex >=
+                                                totalItems - 1) {
+                                              _selectedIndex = (totalItems - 2)
+                                                  .clamp(0, totalItems - 1);
                                             }
                                           } else {
-                                            _localShowHiddenFolders.add(currentNode.key);
+                                            _localShowHiddenFolders
+                                                .add(currentNode.key);
                                           }
                                         });
                                       }
@@ -1241,10 +1245,13 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                 itemCount: totalItems,
                                 itemBuilder: (context, index) {
                                   if (index == displayedChildren.length) {
-                                    final bool isShowingLocally = _localShowHiddenFolders.contains(currentNode.key);
+                                    final bool isShowingLocally =
+                                        _localShowHiddenFolders
+                                            .contains(currentNode.key);
                                     return ListTile(
                                       selected: index == _selectedIndex,
-                                      selectedTileColor: Colors.blue.withAlpha(25),
+                                      selectedTileColor:
+                                          Colors.blue.withAlpha(25),
                                       leading: const Icon(Icons.visibility),
                                       title: Text(isShowingLocally
                                           ? 'Hide $hiddenCount hidden items'
@@ -1253,13 +1260,17 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                         setState(() {
                                           _selectedIndex = index;
                                           if (isShowingLocally) {
-                                            _localShowHiddenFolders.remove(currentNode.key);
+                                            _localShowHiddenFolders
+                                                .remove(currentNode.key);
                                             // Clamp selected index
-                                            if (_selectedIndex >= totalItems - 1) {
-                                                _selectedIndex = (totalItems - 2).clamp(0, totalItems - 1);
+                                            if (_selectedIndex >=
+                                                totalItems - 1) {
+                                              _selectedIndex = (totalItems - 2)
+                                                  .clamp(0, totalItems - 1);
                                             }
                                           } else {
-                                            _localShowHiddenFolders.add(currentNode.key);
+                                            _localShowHiddenFolders
+                                                .add(currentNode.key);
                                           }
                                         });
                                       },
