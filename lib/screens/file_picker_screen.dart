@@ -793,7 +793,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       hiddenCount = currentNode.children.where((node) {
         return node.label.startsWith('.') &&
             node.label != '.' &&
-            node.label != '..';
+            node.label != '..' &&
+            node.label.toLowerCase().contains(_searchQuery.toLowerCase());
       }).length;
 
       effectivelyShowHidden =
@@ -850,6 +851,11 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
 
     bool showHiddenToggleItem = !_showHiddenFiles && hiddenCount > 0;
     int totalItems = displayedChildren.length + (showHiddenToggleItem ? 1 : 0);
+
+    // Centralized clamping
+    if (_selectedIndex >= totalItems) {
+      _selectedIndex = totalItems > 0 ? totalItems - 1 : 0;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -1222,12 +1228,6 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                               .contains(currentNode.key)) {
                                             _localShowHiddenFolders
                                                 .remove(currentNode.key);
-                                            // Optional: Clamp selected index when hiding locally
-                                            if (_selectedIndex >=
-                                                totalItems - 1) {
-                                              _selectedIndex = (totalItems - 2)
-                                                  .clamp(0, totalItems - 1);
-                                            }
                                           } else {
                                             _localShowHiddenFolders
                                                 .add(currentNode.key);
@@ -1262,12 +1262,6 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                           if (isShowingLocally) {
                                             _localShowHiddenFolders
                                                 .remove(currentNode.key);
-                                            // Clamp selected index
-                                            if (_selectedIndex >=
-                                                totalItems - 1) {
-                                              _selectedIndex = (totalItems - 2)
-                                                  .clamp(0, totalItems - 1);
-                                            }
                                           } else {
                                             _localShowHiddenFolders
                                                 .add(currentNode.key);
