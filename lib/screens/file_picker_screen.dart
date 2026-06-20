@@ -1226,8 +1226,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                           details.globalPosition.dx,
                                           details.globalPosition.dy,
                                         ),
-                                        items: [
-                                          PopupMenuItem(
+                                        items: <PopupMenuEntry<String>>[
+                                          PopupMenuItem<String>(
                                             value: 'toggle_opened',
                                             child: Text(
                                               listNode.isOpened
@@ -1235,10 +1235,23 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                                   : 'Mark as Opened',
                                             ),
                                           ),
-                                          const PopupMenuItem(
+                                          const PopupMenuItem<String>(
                                             value: 'copy_path',
                                             child: Text('Copy Full Path'),
                                           ),
+                                          if (listNode.isDir)
+                                            const PopupMenuDivider(),
+                                          if (listNode.isDir)
+                                            const PopupMenuItem<String>(
+                                              value: 'export_dir',
+                                              child: Text('Export Directory'),
+                                            ),
+                                          if (listNode.isDir)
+                                            const PopupMenuItem<String>(
+                                              value: 'export_tree',
+                                              child:
+                                                  Text('Export Directory Tree'),
+                                            ),
                                         ],
                                       ).then((value) {
                                         if (value == 'toggle_opened') {
@@ -1246,6 +1259,10 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                             listNode.isOpened =
                                                 !listNode.isOpened;
                                           });
+                                        } else if (value == 'export_dir') {
+                                          _exportDirectory(listNode);
+                                        } else if (value == 'export_tree') {
+                                          _exportDirectoryTree(listNode);
                                         } else if (value == 'copy_path') {
                                           Clipboard.setData(
                                             ClipboardData(text: listNode.key),
