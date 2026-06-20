@@ -109,7 +109,8 @@ class MlocateDBParser {
       final isLastNode = _calculatedNodes == _nodeCounter;
       if (_calculatedNodes % 1024 == 0 || isLastNode) {
         final now = DateTime.now();
-        if (isLastNode || now.difference(_lastProgressTime).inMilliseconds >= 500) {
+        if (isLastNode ||
+            now.difference(_lastProgressTime).inMilliseconds >= 500) {
           _lastProgressTime = now;
           double calculateProgress =
               _nodeCounter > 0 ? (_calculatedNodes / _nodeCounter) : 0.0;
