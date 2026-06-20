@@ -72,6 +72,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
 
   // Hidden files toggle
   bool _showHiddenFiles = false;
+  final Set<String> _localShowHiddenFolders = {};
   List<Node> _locateResults = [];
   bool _isLocating = false;
   bool _cancelLocateRequested = false;
@@ -785,9 +786,20 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         _navigationStack.isNotEmpty ? _navigationStack.last : null;
 
     List<Node> displayedChildren = [];
+    int hiddenCount = 0;
+    bool effectivelyShowHidden = _showHiddenFiles;
+
     if (currentNode != null) {
+      hiddenCount = currentNode.children.where((node) {
+        return node.label.startsWith('.') &&
+            node.label != '.' &&
+            node.label != '..';
+      }).length;
+
+      effectivelyShowHidden = _showHiddenFiles || _localShowHiddenFolders.contains(currentNode.key);
+
       displayedChildren = currentNode.children.where((node) {
-        if (!_showHiddenFiles &&
+        if (!effectivelyShowHidden &&
             node.label.startsWith('.') &&
             node.label != '.' &&
             node.label != '..') {
@@ -834,6 +846,9 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         }
       });
     }
+
+    bool showHiddenToggleItem = !_showHiddenFiles && hiddenCount > 0;
+    int totalItems = displayedChildren.length + (showHiddenToggleItem ? 1 : 0);
 
     return Scaffold(
       appBar: AppBar(
@@ -1145,7 +1160,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                   if (event.logicalKey ==
                                       LogicalKeyboardKey.arrowDown) {
                                     if (_selectedIndex <
-                                        displayedChildren.length - 1) {
+                                        totalItems - 1) {
                                       setState(() {
                                         _selectedIndex++;
                                         _scrollToSelectedIndex();
@@ -1166,26 +1181,26 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                     return KeyEventResult.handled;
                                   } else if (event.logicalKey ==
                                       LogicalKeyboardKey.pageDown) {
-                                    if (displayedChildren.isEmpty) {
+                                    if (totalItems == 0) {
                                       return KeyEventResult.ignored;
                                     }
                                     setState(() {
                                       _selectedIndex = (_selectedIndex + 10)
                                           .clamp(
-                                              0, displayedChildren.length - 1)
+                                              0, totalItems - 1)
                                           .toInt();
                                       _scrollToSelectedIndex();
                                     });
                                     return KeyEventResult.handled;
                                   } else if (event.logicalKey ==
                                       LogicalKeyboardKey.pageUp) {
-                                    if (displayedChildren.isEmpty) {
+                                    if (totalItems == 0) {
                                       return KeyEventResult.ignored;
                                     }
                                     setState(() {
                                       _selectedIndex = (_selectedIndex - 10)
                                           .clamp(
-                                              0, displayedChildren.length - 1)
+                                              0, totalItems - 1)
                                           .toInt();
                                       _scrollToSelectedIndex();
                                     });
@@ -1196,12 +1211,25 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                     return KeyEventResult.handled;
                                   } else if (event.logicalKey ==
                                       LogicalKeyboardKey.enter) {
-                                    if (displayedChildren.isNotEmpty &&
+                                    if (totalItems > 0 &&
                                         _selectedIndex >= 0 &&
                                         _selectedIndex <
-                                            displayedChildren.length) {
-                                      _navigateTo(
-                                          displayedChildren[_selectedIndex]);
+                                            totalItems) {
+                                      if (_selectedIndex < displayedChildren.length) {
+                                        _navigateTo(displayedChildren[_selectedIndex]);
+                                      } else if (showHiddenToggleItem) {
+                                        setState(() {
+                                          if (_localShowHiddenFolders.contains(currentNode.key)) {
+                                            _localShowHiddenFolders.remove(currentNode.key);
+                                            // Optional: Clamp selected index when hiding locally
+                                            if (_selectedIndex >= totalItems - 1) {
+                                              _selectedIndex = (totalItems - 2).clamp(0, totalItems - 1);
+                                            }
+                                          } else {
+                                            _localShowHiddenFolders.add(currentNode.key);
+                                          }
+                                        });
+                                      }
                                     }
                                     return KeyEventResult.handled;
                                   }
@@ -1210,8 +1238,34 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                               },
                               child: ListView.builder(
                                 controller: _scrollController,
-                                itemCount: displayedChildren.length,
+                                itemCount: totalItems,
                                 itemBuilder: (context, index) {
+                                  if (index == displayedChildren.length) {
+                                    final bool isShowingLocally = _localShowHiddenFolders.contains(currentNode.key);
+                                    return ListTile(
+                                      selected: index == _selectedIndex,
+                                      selectedTileColor: Colors.blue.withAlpha(25),
+                                      leading: const Icon(Icons.visibility),
+                                      title: Text(isShowingLocally
+                                          ? 'Hide $hiddenCount hidden items'
+                                          : 'Show $hiddenCount hidden items'),
+                                      onTap: () {
+                                        setState(() {
+                                          _selectedIndex = index;
+                                          if (isShowingLocally) {
+                                            _localShowHiddenFolders.remove(currentNode.key);
+                                            // Clamp selected index
+                                            if (_selectedIndex >= totalItems - 1) {
+                                                _selectedIndex = (totalItems - 2).clamp(0, totalItems - 1);
+                                            }
+                                          } else {
+                                            _localShowHiddenFolders.add(currentNode.key);
+                                          }
+                                        });
+                                      },
+                                    );
+                                  }
+
                                   final listNode = displayedChildren[index];
                                   final isUnvisitedFolder =
                                       listNode.isDir && !listNode.isOpened;
