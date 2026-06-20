@@ -43,3 +43,5 @@ app.*.map.json
 /android/app/release
 /gentoo-mlocate.db
 hexdump100.txt
+/directory_*.json
+/directory_*.txt
