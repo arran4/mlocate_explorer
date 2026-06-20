@@ -1239,21 +1239,21 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                             value: 'copy_path',
                                             child: Text('Copy Full Path'),
                                           ),
-                                          if (listNode.isDir)
+                                          if (listNode.isDir) ...[
                                             const PopupMenuDivider(),
-                                          if (listNode.isDir)
                                             const PopupMenuItem<String>(
                                               value: 'export_dir',
                                               child: Text('Export Directory'),
                                             ),
-                                          if (listNode.isDir)
                                             const PopupMenuItem<String>(
                                               value: 'export_tree',
                                               child:
                                                   Text('Export Directory Tree'),
                                             ),
+                                          ],
                                         ],
                                       ).then((value) {
+                                        if (!mounted) return;
                                         if (value == 'toggle_opened') {
                                           setState(() {
                                             listNode.isOpened =
