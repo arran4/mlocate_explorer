@@ -850,7 +850,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     }
 
     bool showHiddenToggleItem = !_showHiddenFiles && hiddenCount > 0;
-    int totalItems = displayedChildren.length + (showHiddenToggleItem ? 1 : 0);
+    int totalItems = displayedChildren.length;
 
     // Centralized clamping
     if (_selectedIndex >= totalItems) {
@@ -1101,6 +1101,48 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                 ],
               ),
             ),
+          if (currentNode != null &&
+              showHiddenToggleItem &&
+              !_isLoading &&
+              !_isLocateMode)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, size: 16, color: Colors.grey),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${_localShowHiddenFolders.contains(currentNode.key) ? "Showing" : "Hiding"} $hiddenCount hidden items.',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 0),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        if (_localShowHiddenFolders.contains(currentNode.key)) {
+                          _localShowHiddenFolders.remove(currentNode.key);
+                        } else {
+                          _localShowHiddenFolders.add(currentNode.key);
+                        }
+                      });
+                    },
+                    child: Text(
+                      _localShowHiddenFolders.contains(currentNode.key)
+                          ? 'Hide'
+                          : 'Show',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Expanded(
             child: Center(
               child: _isLoading
@@ -1218,22 +1260,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                     if (totalItems > 0 &&
                                         _selectedIndex >= 0 &&
                                         _selectedIndex < totalItems) {
-                                      if (_selectedIndex <
-                                          displayedChildren.length) {
-                                        _navigateTo(
-                                            displayedChildren[_selectedIndex]);
-                                      } else if (showHiddenToggleItem) {
-                                        setState(() {
-                                          if (_localShowHiddenFolders
-                                              .contains(currentNode.key)) {
-                                            _localShowHiddenFolders
-                                                .remove(currentNode.key);
-                                          } else {
-                                            _localShowHiddenFolders
-                                                .add(currentNode.key);
-                                          }
-                                        });
-                                      }
+                                      _navigateTo(
+                                          displayedChildren[_selectedIndex]);
                                     }
                                     return KeyEventResult.handled;
                                   }
@@ -1244,33 +1272,6 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                 controller: _scrollController,
                                 itemCount: totalItems,
                                 itemBuilder: (context, index) {
-                                  if (index == displayedChildren.length) {
-                                    final bool isShowingLocally =
-                                        _localShowHiddenFolders
-                                            .contains(currentNode.key);
-                                    return ListTile(
-                                      selected: index == _selectedIndex,
-                                      selectedTileColor:
-                                          Colors.blue.withAlpha(25),
-                                      leading: const Icon(Icons.visibility),
-                                      title: Text(isShowingLocally
-                                          ? 'Hide $hiddenCount hidden items'
-                                          : 'Show $hiddenCount hidden items'),
-                                      onTap: () {
-                                        setState(() {
-                                          _selectedIndex = index;
-                                          if (isShowingLocally) {
-                                            _localShowHiddenFolders
-                                                .remove(currentNode.key);
-                                          } else {
-                                            _localShowHiddenFolders
-                                                .add(currentNode.key);
-                                          }
-                                        });
-                                      },
-                                    );
-                                  }
-
                                   final listNode = displayedChildren[index];
                                   final isUnvisitedFolder =
                                       listNode.isDir && !listNode.isOpened;
