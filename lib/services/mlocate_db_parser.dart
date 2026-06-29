@@ -18,6 +18,7 @@ class MlocateDBParser {
   String _currentDirectoryPath = '/';
   int _nodeCounter = 0;
   int _calculatedNodes = 0;
+  DateTime _lastProgressTime = DateTime.now();
 
   void _addError(String description) {
     int offset = 0;
@@ -105,13 +106,19 @@ class MlocateDBParser {
   void _calculateCounts(Node node) {
     if (onProgress != null) {
       _calculatedNodes++;
-      if (_calculatedNodes % 1024 == 0) {
-        double calculateProgress =
-            _nodeCounter > 0 ? (_calculatedNodes / _nodeCounter) : 0.0;
-        onProgress!(
-          0.9 + (calculateProgress * 0.1),
-          'Calculating node statistics...',
-        );
+      final isLastNode = _calculatedNodes == _nodeCounter;
+      if (_calculatedNodes % 1024 == 0 || isLastNode) {
+        final now = DateTime.now();
+        if (isLastNode ||
+            now.difference(_lastProgressTime).inMilliseconds >= 500) {
+          _lastProgressTime = now;
+          double calculateProgress =
+              _nodeCounter > 0 ? (_calculatedNodes / _nodeCounter) : 0.0;
+          onProgress!(
+            0.9 + (calculateProgress * 0.1),
+            'Calculating node statistics ($_calculatedNodes / $_nodeCounter nodes)...',
+          );
+        }
       }
     }
 
@@ -218,13 +225,17 @@ class MlocateDBParser {
     int iterations = 0;
     while (true) {
       if (onProgress != null && iterations % 4096 == 0) {
-        try {
-          double progress = file.positionSync() / fileSize;
-          onProgress!(
-            progress * 0.9,
-            'Reading directories...',
-          ); // Reserve 10% for calculateCounts
-        } catch (_) {}
+        final now = DateTime.now();
+        if (now.difference(_lastProgressTime).inMilliseconds >= 500) {
+          _lastProgressTime = now;
+          try {
+            double progress = file.positionSync() / fileSize;
+            onProgress!(
+              progress * 0.9,
+              'Reading directories ($_nodeCounter nodes)...',
+            ); // Reserve 10% for calculateCounts
+          } catch (_) {}
+        }
       }
       iterations++;
       try {
