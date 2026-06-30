@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:glob/glob.dart';
 
 import '../models/node.dart';
 import '../services/mlocate_db_parser.dart';
@@ -35,6 +36,8 @@ void _parseIsolateEntry(Map<String, dynamic> args) {
 enum GroupOption { dirsFirst, filesFirst, none }
 
 enum SortOption { nameAsc, nameDesc, modifiedAsc, modifiedDesc, mlocateOrder }
+
+enum LocateSearchMode { infix, prefix, suffix, exact, regex, glob }
 
 class FilePickerScreen extends StatefulWidget {
   const FilePickerScreen({super.key});
@@ -76,6 +79,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
   List<Node> _locateResults = [];
   bool _isLocating = false;
   bool _cancelLocateRequested = false;
+  LocateSearchMode _locateSearchMode = LocateSearchMode.infix;
+  final List<Node> _searchIndex = [];
 
   @override
   void dispose() {
@@ -114,6 +119,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       _isLocateMode = false;
       _locateController.text = '';
       _locateResults.clear();
+      _searchIndex.clear();
     });
   }
 
@@ -128,7 +134,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     if (rootNode == null) return;
     if (_isLocating) return;
 
-    query = query.trim().toLowerCase();
+    final trimmedQuery = query.trim();
 
     setState(() {
       _isLocateMode = true;
@@ -138,46 +144,119 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       _selectedIndex = 0;
     });
 
-    if (query.isEmpty) {
+    if (trimmedQuery.isEmpty) {
       setState(() {
         _isLocating = false;
       });
       return;
     }
 
-    List<Node> results = [];
-    List<Node> queue = [rootNode!];
-    int iterations = 0;
+    if (_searchIndex.isEmpty) {
+      List<Node> queue = [rootNode!];
+      int iterations = 0;
+      while (queue.isNotEmpty) {
+        Node current = queue.removeLast();
+        _searchIndex.add(current);
+        for (int i = current.children.length - 1; i >= 0; i--) {
+          queue.add(current.children[i]);
+        }
+        iterations++;
+        if (iterations % 10000 == 0) {
+          await Future.delayed(Duration.zero);
+        }
+      }
+    }
 
-    while (queue.isNotEmpty) {
+    List<Node> results = [];
+    int searchIterations = 0;
+
+    RegExp? regexPattern;
+    Glob? globPattern;
+    final lowercaseQuery = trimmedQuery.toLowerCase();
+
+    if (_locateSearchMode == LocateSearchMode.regex) {
+      try {
+        regexPattern = RegExp(trimmedQuery);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Invalid Regular Expression: $e')),
+          );
+        }
+        setState(() {
+          _isLocating = false;
+        });
+        return;
+      }
+    } else if (_locateSearchMode == LocateSearchMode.glob) {
+      try {
+        globPattern = Glob(trimmedQuery);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Invalid Glob Pattern: $e')),
+          );
+        }
+        setState(() {
+          _isLocating = false;
+        });
+        return;
+      }
+    }
+
+    for (int i = 0; i < _searchIndex.length; i++) {
       if (_cancelLocateRequested) {
         break;
       }
 
-      Node current = queue.removeLast();
+      Node current = _searchIndex[i];
 
       if (!_showHiddenFiles && current != rootNode) {
-        if (current.label.isNotEmpty &&
-            current.label.startsWith('.') &&
-            current.label != '.' &&
-            current.label != '..') {
+        // Since we are iterating over a flattened list, we can't just skip the current node.
+        // We must check if the entire path contains a hidden directory component.
+        // E.g., "/home/user/.hidden_dir/visible_file.txt" should be hidden.
+        bool hasHiddenComponent = false;
+        // Split path into parts, ignoring empty strings (e.g., from leading slash)
+        final parts = current.key.split('/').where((p) => p.isNotEmpty);
+        for (final part in parts) {
+          if (part.startsWith('.') && part != '.' && part != '..') {
+            hasHiddenComponent = true;
+            break;
+          }
+        }
+        if (hasHiddenComponent) {
           continue;
         }
       }
 
-      // Basic locate logic: full path contains query string case-insensitively
-      if (current.key.toLowerCase().contains(query)) {
+      bool match = false;
+      switch (_locateSearchMode) {
+        case LocateSearchMode.infix:
+          match = current.key.toLowerCase().contains(lowercaseQuery);
+          break;
+        case LocateSearchMode.prefix:
+          match = current.key.toLowerCase().startsWith(lowercaseQuery);
+          break;
+        case LocateSearchMode.suffix:
+          match = current.key.toLowerCase().endsWith(lowercaseQuery);
+          break;
+        case LocateSearchMode.exact:
+          match = current.key.toLowerCase() == lowercaseQuery;
+          break;
+        case LocateSearchMode.regex:
+          match = regexPattern?.hasMatch(current.key) ?? false;
+          break;
+        case LocateSearchMode.glob:
+          match = globPattern?.matches(current.key) ?? false;
+          break;
+      }
+
+      if (match) {
         results.add(current);
       }
 
-      // Iterate backwards to process children in correct order when popping from end
-      for (int i = current.children.length - 1; i >= 0; i--) {
-        queue.add(current.children[i]);
-      }
-
-      iterations++;
-      // Yield to the event loop every 10000 iterations to avoid blocking UI thread
-      if (iterations % 10000 == 0) {
+      searchIterations++;
+      if (searchIterations % 10000 == 0) {
         if (mounted) {
           setState(() {
             _locateResults = List.from(results);
@@ -961,6 +1040,45 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
               child: _isLocateMode
                   ? Row(
                       children: [
+                        DropdownButton<LocateSearchMode>(
+                          value: _locateSearchMode,
+                          items: const [
+                            DropdownMenuItem(
+                              value: LocateSearchMode.infix,
+                              child: Text('Infix'),
+                            ),
+                            DropdownMenuItem(
+                              value: LocateSearchMode.prefix,
+                              child: Text('Prefix'),
+                            ),
+                            DropdownMenuItem(
+                              value: LocateSearchMode.suffix,
+                              child: Text('Suffix'),
+                            ),
+                            DropdownMenuItem(
+                              value: LocateSearchMode.exact,
+                              child: Text('Exact'),
+                            ),
+                            DropdownMenuItem(
+                              value: LocateSearchMode.regex,
+                              child: Text('RegExp'),
+                            ),
+                            DropdownMenuItem(
+                              value: LocateSearchMode.glob,
+                              child: Text('Glob'),
+                            ),
+                          ],
+                          onChanged: _isLocating
+                              ? null
+                              : (LocateSearchMode? newValue) {
+                                  if (newValue != null) {
+                                    setState(() {
+                                      _locateSearchMode = newValue;
+                                    });
+                                  }
+                                },
+                        ),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: TextField(
                             controller: _locateController,
