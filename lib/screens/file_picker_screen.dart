@@ -10,6 +10,7 @@ import 'package:glob/glob.dart';
 
 import '../models/node.dart';
 import '../services/mlocate_db_parser.dart';
+import '../widgets/modify_node_dialog.dart';
 
 void _parseIsolateEntry(Map<String, dynamic> args) {
   SendPort sendPort = args['sendPort'];
@@ -1420,6 +1421,11 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                             value: 'copy_path',
                                             child: Text('Copy Full Path'),
                                           ),
+                                          const PopupMenuDivider(),
+                                          const PopupMenuItem<String>(
+                                            value: 'modify',
+                                            child: Text('Modify / Delete'),
+                                          ),
                                           if (listNode.isDir) ...[
                                             const PopupMenuDivider(),
                                             const PopupMenuItem<String>(
@@ -1440,6 +1446,50 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                             listNode.isOpened =
                                                 !listNode.isOpened;
                                           });
+                                        } else if (value == 'modify') {
+                                          showDialog(
+                                            context: context,
+                                            builder: (context) =>
+                                                ModifyNodeDialog(
+                                              node: listNode,
+                                              onModified: (modifiedNode) {
+                                                setState(() {});
+                                              },
+                                              onDeleted: (deletedNode) {
+                                                setState(() {
+                                                  bool removeRecursively(
+                                                      Node current) {
+                                                    int initialLen =
+                                                        current.children.length;
+                                                    current.children
+                                                        .removeWhere((n) =>
+                                                            n.key ==
+                                                            deletedNode.key);
+                                                    if (current
+                                                            .children.length <
+                                                        initialLen) {
+                                                      return true;
+                                                    }
+                                                    for (var child
+                                                        in current.children) {
+                                                      if (child.isDir) {
+                                                        if (removeRecursively(
+                                                            child)) {
+                                                          return true;
+                                                        }
+                                                      }
+                                                    }
+                                                    return false;
+                                                  }
+
+                                                  if (rootNode != null) {
+                                                    removeRecursively(
+                                                        rootNode!);
+                                                  }
+                                                });
+                                              },
+                                            ),
+                                          );
                                         } else if (value == 'export_dir') {
                                           _exportDirectory(listNode);
                                         } else if (value == 'export_tree') {
@@ -1447,17 +1497,18 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                         } else if (value == 'copy_path') {
                                           Clipboard.setData(
                                             ClipboardData(text: listNode.key),
-                                          );
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                  'Copied path to clipboard',
+                                          ).then((_) {
+                                            if (context.mounted) {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Copied path to clipboard',
+                                                  ),
                                                 ),
-                                              ),
-                                            );
-                                          }
+                                              );
+                                            }
+                                          });
                                         }
                                       });
                                     },
@@ -1585,7 +1636,7 @@ class _NodeSubtitleState extends State<_NodeSubtitle> {
   Widget build(BuildContext context) {
     final node = widget.node;
     final timeToDisplay = node.modifiedTime;
-    final sizeToDisplay = _stat?.size;
+    final sizeToDisplay = node.sizeOverride ?? _stat?.size;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
