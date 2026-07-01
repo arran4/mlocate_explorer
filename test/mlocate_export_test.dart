@@ -65,13 +65,15 @@ void main() {
       expect(parsedRoot?.label, '/mock_root');
       expect(parsedRoot?.children.length, 2);
 
-      final folder1 = parsedRoot?.children.firstWhere((n) => n.label == 'folder1');
+      final folder1 =
+          parsedRoot?.children.firstWhere((n) => n.label == 'folder1');
       expect(folder1?.isDir, true);
       expect(folder1?.children.length, 2);
       expect(folder1?.children.any((n) => n.label == 'file1.txt'), true);
       expect(folder1?.children.any((n) => n.label == 'file2.txt'), true);
 
-      final file3 = parsedRoot?.children.firstWhere((n) => n.label == 'file3.txt');
+      final file3 =
+          parsedRoot?.children.firstWhere((n) => n.label == 'file3.txt');
       expect(file3?.isDir, false);
       expect(file3?.children, isEmpty);
 

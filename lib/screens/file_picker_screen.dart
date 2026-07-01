@@ -624,7 +624,11 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       return;
     }
 
-    final ext = format == 'json' ? 'json' : format == 'mlocate' ? 'db' : 'txt';
+    final ext = format == 'json'
+        ? 'json'
+        : format == 'mlocate'
+            ? 'db'
+            : 'txt';
     final savePath = await FilePicker.platform.saveFile(
       dialogTitle: 'Export Directory',
       fileName: 'directory_export.$ext',
@@ -783,7 +787,11 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       return;
     }
 
-    final ext = format == 'json' ? 'json' : format == 'mlocate' ? 'db' : 'txt';
+    final ext = format == 'json'
+        ? 'json'
+        : format == 'mlocate'
+            ? 'db'
+            : 'txt';
     final savePath = await FilePicker.platform.saveFile(
       dialogTitle: 'Export Directory Tree',
       fileName: 'directory_tree_export.$ext',
