@@ -550,16 +550,27 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     );
 
     if (savePath != null) {
-      // Direct export using rootNode without filtering
-      final writer = MlocateDBWriter(savePath, rootNode!);
-      writer.write();
+      try {
+        // Direct export using rootNode without filtering
+        final writer = MlocateDBWriter(savePath, rootNode!);
+        await Isolate.run(() => writer.write());
 
-      if (mounted && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Exported database to $savePath'),
-          ),
-        );
+        if (mounted && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Exported database to $savePath'),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to export database: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
@@ -656,8 +667,20 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
               .toList(),
         );
 
-        final writer = MlocateDBWriter(savePath, clonedNode);
-        writer.write();
+        try {
+          final writer = MlocateDBWriter(savePath, clonedNode);
+          await Isolate.run(() => writer.write());
+        } catch (e) {
+          if (mounted && context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to export directory: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
       } else if (format == 'json') {
         Map<String, dynamic> toMapFlat(Node n) {
           return {
@@ -795,8 +818,20 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
           );
         }
 
-        final writer = MlocateDBWriter(savePath, cloneTree(node));
-        writer.write();
+        try {
+          final writer = MlocateDBWriter(savePath, cloneTree(node));
+          await Isolate.run(() => writer.write());
+        } catch (e) {
+          if (mounted && context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to export directory tree: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
       } else if (format == 'json') {
         Map<String, dynamic> serializeNode(Node n) {
           final childrenList = <Map<String, dynamic>>[];
