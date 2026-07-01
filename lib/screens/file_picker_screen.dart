@@ -10,6 +10,7 @@ import 'package:glob/glob.dart';
 
 import '../models/node.dart';
 import '../services/mlocate_db_parser.dart';
+import '../services/mlocate_db_writer.dart';
 import '../widgets/modify_node_dialog.dart';
 
 void _parseIsolateEntry(Map<String, dynamic> args) {
@@ -540,6 +541,29 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     }
   }
 
+  Future<void> _exportWholeDb() async {
+    if (rootNode == null) return;
+
+    final savePath = await FilePicker.platform.saveFile(
+      dialogTitle: 'Export Whole DB as mlocate.db',
+      fileName: 'exported.db',
+    );
+
+    if (savePath != null) {
+      // Direct export using rootNode without filtering
+      final writer = MlocateDBWriter(savePath, rootNode!);
+      writer.write();
+
+      if (mounted && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Exported database to $savePath'),
+          ),
+        );
+      }
+    }
+  }
+
   Future<String?> _showExportFormatDialog(bool isTree) async {
     return showDialog<String>(
       context: context,
@@ -571,6 +595,11 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                 subtitle: const Text('Structured JSON data'),
                 onTap: () => Navigator.of(context).pop('json'),
               ),
+              ListTile(
+                title: const Text('mlocate.db'),
+                subtitle: const Text('Binary mlocate database format'),
+                onTap: () => Navigator.of(context).pop('mlocate'),
+              ),
             ],
           ),
         );
@@ -584,14 +613,52 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       return;
     }
 
-    final ext = format == 'json' ? 'json' : 'txt';
+    final ext = format == 'json' ? 'json' : format == 'mlocate' ? 'db' : 'txt';
     final savePath = await FilePicker.platform.saveFile(
       dialogTitle: 'Export Directory',
       fileName: 'directory_export.$ext',
     );
 
     if (savePath != null) {
-      if (format == 'json') {
+      if (format == 'mlocate') {
+        final clonedNode = Node(
+          key: node.key,
+          label: node.label,
+          isDir: node.isDir,
+          modifiedTime: node.modifiedTime,
+          isOpened: node.isOpened,
+          subFileCount: node.subFileCount,
+          subFolderCount: node.subFolderCount,
+          deepFileCount: node.deepFileCount,
+          deepFolderCount: node.deepFolderCount,
+          mlocateIndex: node.mlocateIndex,
+          sizeOverride: node.sizeOverride,
+          children: node.children
+              .where((child) {
+                if (_showHiddenFiles) return true;
+                final label = child.label;
+                return !label.startsWith('.') || label == '.' || label == '..';
+              })
+              .map((child) => Node(
+                    key: child.key,
+                    label: child.label,
+                    isDir: child.isDir,
+                    modifiedTime: child.modifiedTime,
+                    isOpened: child.isOpened,
+                    subFileCount: child.subFileCount,
+                    subFolderCount: child.subFolderCount,
+                    deepFileCount: child.deepFileCount,
+                    deepFolderCount: child.deepFolderCount,
+                    mlocateIndex: child.mlocateIndex,
+                    sizeOverride: child.sizeOverride,
+                    children: const [], // shallow export
+                  ))
+              .toList(),
+        );
+
+        final writer = MlocateDBWriter(savePath, clonedNode);
+        writer.write();
+      } else if (format == 'json') {
         Map<String, dynamic> toMapFlat(Node n) {
           return {
             'key': n.key,
@@ -693,14 +760,44 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       return;
     }
 
-    final ext = format == 'json' ? 'json' : 'txt';
+    final ext = format == 'json' ? 'json' : format == 'mlocate' ? 'db' : 'txt';
     final savePath = await FilePicker.platform.saveFile(
       dialogTitle: 'Export Directory Tree',
       fileName: 'directory_tree_export.$ext',
     );
 
     if (savePath != null) {
-      if (format == 'json') {
+      if (format == 'mlocate') {
+        Node cloneTree(Node n) {
+          final childrenList = <Node>[];
+          for (final child in n.children) {
+            if (!_showHiddenFiles &&
+                child.label.startsWith('.') &&
+                child.label != '.' &&
+                child.label != '..') {
+              continue;
+            }
+            childrenList.add(cloneTree(child));
+          }
+          return Node(
+            key: n.key,
+            label: n.label,
+            isDir: n.isDir,
+            modifiedTime: n.modifiedTime,
+            isOpened: n.isOpened,
+            subFileCount: n.subFileCount,
+            subFolderCount: n.subFolderCount,
+            deepFileCount: n.deepFileCount,
+            deepFolderCount: n.deepFolderCount,
+            mlocateIndex: n.mlocateIndex,
+            sizeOverride: n.sizeOverride,
+            children: childrenList,
+          );
+        }
+
+        final writer = MlocateDBWriter(savePath, cloneTree(node));
+        writer.write();
+      } else if (format == 'json') {
         Map<String, dynamic> serializeNode(Node n) {
           final childrenList = <Map<String, dynamic>>[];
           for (final child in n.children) {
@@ -1003,6 +1100,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                   setState(() {
                     _showHiddenFiles = !_showHiddenFiles;
                   });
+                } else if (value == 'export_whole_db') {
+                  _exportWholeDb();
                 }
               },
               itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
@@ -1015,6 +1114,10 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                   ),
                 ),
                 const PopupMenuDivider(),
+                const PopupMenuItem<String>(
+                  value: 'export_whole_db',
+                  child: Text('Export Whole DB'),
+                ),
                 const PopupMenuItem<String>(
                   value: 'export_dir',
                   child: Text('Export Directory'),
