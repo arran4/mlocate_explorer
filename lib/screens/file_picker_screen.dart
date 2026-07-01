@@ -1454,10 +1454,15 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                                 ModifyNodeDialog(
                                               node: listNode,
                                               onModified: (modifiedNode) {
-                                                setState(() {});
+                                                setState(() {
+                                                  _searchIndex.clear();
+                                                  _hiddenKeys.clear();
+                                                });
                                               },
                                               onDeleted: (deletedNode) {
                                                 setState(() {
+                                                  _searchIndex.clear();
+                                                  _hiddenKeys.clear();
                                                   bool removeRecursively(
                                                       Node current) {
                                                     int initialLen =
@@ -1483,8 +1488,45 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                                     return false;
                                                   }
 
+                                                  void recalculateCounts(
+                                                      Node node) {
+                                                    if (!node.isDir) return;
+                                                    int subFiles = 0;
+                                                    int subFolders = 0;
+                                                    int deepFiles = 0;
+                                                    int deepFolders = 0;
+
+                                                    for (var child
+                                                        in node.children) {
+                                                      if (child.isDir) {
+                                                        subFolders++;
+                                                        deepFolders++;
+                                                        recalculateCounts(
+                                                            child);
+                                                        deepFiles +=
+                                                            child.deepFileCount;
+                                                        deepFolders += child
+                                                            .deepFolderCount;
+                                                      } else {
+                                                        subFiles++;
+                                                        deepFiles++;
+                                                      }
+                                                    }
+
+                                                    node.subFileCount =
+                                                        subFiles;
+                                                    node.subFolderCount =
+                                                        subFolders;
+                                                    node.deepFileCount =
+                                                        deepFiles;
+                                                    node.deepFolderCount =
+                                                        deepFolders;
+                                                  }
+
                                                   if (rootNode != null) {
                                                     removeRecursively(
+                                                        rootNode!);
+                                                    recalculateCounts(
                                                         rootNode!);
                                                   }
                                                 });

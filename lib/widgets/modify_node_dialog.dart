@@ -108,12 +108,38 @@ class _ModifyNodeDialogState extends State<ModifyNodeDialog> {
         ),
         TextButton(
           onPressed: () {
-            widget.node.label = _nameController.text;
-            final pathParts = widget.node.key.split('/');
-            pathParts.last = widget.node.label;
-            widget.node.key = pathParts.join('/');
+            final newLabel = _nameController.text.trim();
+            if (newLabel.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Name cannot be empty')),
+              );
+              return;
+            }
+
+            final oldKey = widget.node.key;
+            widget.node.label = newLabel;
+            final pathParts = oldKey.split('/');
+            pathParts.last = newLabel;
+            final newKey = pathParts.join('/');
+            widget.node.key = newKey;
+
+            if (oldKey != newKey) {
+              void updateKeys(Node n) {
+                if (n != widget.node) {
+                  n.key = newKey + n.key.substring(oldKey.length);
+                }
+                for (var child in n.children) {
+                  updateKeys(child);
+                }
+              }
+
+              updateKeys(widget.node);
+            }
+
             if (_sizeController.text.isNotEmpty) {
-              widget.node.sizeOverride = int.tryParse(_sizeController.text);
+              final parsedSize = int.tryParse(_sizeController.text);
+              widget.node.sizeOverride =
+                  (parsedSize != null && parsedSize >= 0) ? parsedSize : null;
             } else {
               widget.node.sizeOverride = null;
             }
