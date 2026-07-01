@@ -81,6 +81,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
   bool _cancelLocateRequested = false;
   LocateSearchMode _locateSearchMode = LocateSearchMode.infix;
   final List<Node> _searchIndex = [];
+  final Set<String> _hiddenKeys = {};
 
   @override
   void dispose() {
@@ -120,6 +121,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       _locateController.text = '';
       _locateResults.clear();
       _searchIndex.clear();
+      _hiddenKeys.clear();
     });
   }
 
@@ -152,13 +154,26 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     }
 
     if (_searchIndex.isEmpty) {
-      List<Node> queue = [rootNode!];
+      _hiddenKeys.clear();
+      List<(Node, bool)> queue = [(rootNode!, false)];
       int iterations = 0;
       while (queue.isNotEmpty) {
-        Node current = queue.removeLast();
+        if (!mounted || rootNode == null) {
+          _searchIndex.clear();
+          _hiddenKeys.clear();
+          return;
+        }
+        final (current, isParentHidden) = queue.removeLast();
+        final isCurrentHidden = isParentHidden ||
+            (current.label.startsWith('.') &&
+                current.label != '.' &&
+                current.label != '..');
+        if (isCurrentHidden) {
+          _hiddenKeys.add(current.key);
+        }
         _searchIndex.add(current);
         for (int i = current.children.length - 1; i >= 0; i--) {
-          queue.add(current.children[i]);
+          queue.add((current.children[i], isCurrentHidden));
         }
         iterations++;
         if (iterations % 10000 == 0) {
@@ -182,10 +197,10 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Invalid Regular Expression: $e')),
           );
+          setState(() {
+            _isLocating = false;
+          });
         }
-        setState(() {
-          _isLocating = false;
-        });
         return;
       }
     } else if (_locateSearchMode == LocateSearchMode.glob) {
@@ -196,10 +211,10 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Invalid Glob Pattern: $e')),
           );
+          setState(() {
+            _isLocating = false;
+          });
         }
-        setState(() {
-          _isLocating = false;
-        });
         return;
       }
     }
@@ -212,19 +227,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       Node current = _searchIndex[i];
 
       if (!_showHiddenFiles && current != rootNode) {
-        // Since we are iterating over a flattened list, we can't just skip the current node.
-        // We must check if the entire path contains a hidden directory component.
-        // E.g., "/home/user/.hidden_dir/visible_file.txt" should be hidden.
-        bool hasHiddenComponent = false;
-        // Split path into parts, ignoring empty strings (e.g., from leading slash)
-        final parts = current.key.split('/').where((p) => p.isNotEmpty);
-        for (final part in parts) {
-          if (part.startsWith('.') && part != '.' && part != '..') {
-            hasHiddenComponent = true;
-            break;
-          }
-        }
-        if (hasHiddenComponent) {
+        if (_hiddenKeys.contains(current.key)) {
           continue;
         }
       }
