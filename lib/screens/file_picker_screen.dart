@@ -1447,6 +1447,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                                 !listNode.isOpened;
                                           });
                                         } else if (value == 'modify') {
+                                          if (!context.mounted) return;
                                           showDialog(
                                             context: context,
                                             builder: (context) =>
@@ -1498,7 +1499,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                           Clipboard.setData(
                                             ClipboardData(text: listNode.key),
                                           ).then((_) {
-                                            if (context.mounted) {
+                                            if (mounted && context.mounted) {
                                               ScaffoldMessenger.of(context)
                                                   .showSnackBar(
                                                 const SnackBar(
