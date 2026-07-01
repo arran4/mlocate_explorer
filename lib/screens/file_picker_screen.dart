@@ -10,6 +10,7 @@ import 'package:glob/glob.dart';
 
 import '../models/node.dart';
 import '../services/mlocate_db_parser.dart';
+import '../widgets/modify_node_dialog.dart';
 
 void _parseIsolateEntry(Map<String, dynamic> args) {
   SendPort sendPort = args['sendPort'];
@@ -1420,6 +1421,11 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                             value: 'copy_path',
                                             child: Text('Copy Full Path'),
                                           ),
+                                          const PopupMenuDivider(),
+                                          const PopupMenuItem<String>(
+                                            value: 'modify',
+                                            child: Text('Modify / Delete'),
+                                          ),
                                           if (listNode.isDir) ...[
                                             const PopupMenuDivider(),
                                             const PopupMenuItem<String>(
@@ -1440,6 +1446,93 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                             listNode.isOpened =
                                                 !listNode.isOpened;
                                           });
+                                        } else if (value == 'modify') {
+                                          if (!context.mounted) return;
+                                          showDialog(
+                                            context: context,
+                                            builder: (context) =>
+                                                ModifyNodeDialog(
+                                              node: listNode,
+                                              onModified: (modifiedNode) {
+                                                setState(() {
+                                                  _searchIndex.clear();
+                                                  _hiddenKeys.clear();
+                                                });
+                                              },
+                                              onDeleted: (deletedNode) {
+                                                setState(() {
+                                                  _searchIndex.clear();
+                                                  _hiddenKeys.clear();
+                                                  bool removeRecursively(
+                                                      Node current) {
+                                                    int initialLen =
+                                                        current.children.length;
+                                                    current.children
+                                                        .removeWhere((n) =>
+                                                            n.key ==
+                                                            deletedNode.key);
+                                                    if (current
+                                                            .children.length <
+                                                        initialLen) {
+                                                      return true;
+                                                    }
+                                                    for (var child
+                                                        in current.children) {
+                                                      if (child.isDir) {
+                                                        if (removeRecursively(
+                                                            child)) {
+                                                          return true;
+                                                        }
+                                                      }
+                                                    }
+                                                    return false;
+                                                  }
+
+                                                  void recalculateCounts(
+                                                      Node node) {
+                                                    if (!node.isDir) return;
+                                                    int subFiles = 0;
+                                                    int subFolders = 0;
+                                                    int deepFiles = 0;
+                                                    int deepFolders = 0;
+
+                                                    for (var child
+                                                        in node.children) {
+                                                      if (child.isDir) {
+                                                        subFolders++;
+                                                        deepFolders++;
+                                                        recalculateCounts(
+                                                            child);
+                                                        deepFiles +=
+                                                            child.deepFileCount;
+                                                        deepFolders += child
+                                                            .deepFolderCount;
+                                                      } else {
+                                                        subFiles++;
+                                                        deepFiles++;
+                                                      }
+                                                    }
+
+                                                    node.subFileCount =
+                                                        subFiles;
+                                                    node.subFolderCount =
+                                                        subFolders;
+                                                    node.deepFileCount =
+                                                        deepFiles;
+                                                    node.deepFolderCount =
+                                                        deepFolders;
+                                                  }
+
+                                                  if (rootNode != null) {
+                                                    removeRecursively(
+                                                        rootNode!);
+                                                    recalculateCounts(
+                                                        rootNode!);
+                                                  }
+                                                });
+                                              },
+                                            ),
+                                          );
                                         } else if (value == 'export_dir') {
                                           _exportDirectory(listNode);
                                         } else if (value == 'export_tree') {
@@ -1447,17 +1540,18 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                         } else if (value == 'copy_path') {
                                           Clipboard.setData(
                                             ClipboardData(text: listNode.key),
-                                          );
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                  'Copied path to clipboard',
+                                          ).then((_) {
+                                            if (mounted && context.mounted) {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Copied path to clipboard',
+                                                  ),
                                                 ),
-                                              ),
-                                            );
-                                          }
+                                              );
+                                            }
+                                          });
                                         }
                                       });
                                     },
@@ -1585,7 +1679,7 @@ class _NodeSubtitleState extends State<_NodeSubtitle> {
   Widget build(BuildContext context) {
     final node = widget.node;
     final timeToDisplay = node.modifiedTime;
-    final sizeToDisplay = _stat?.size;
+    final sizeToDisplay = node.sizeOverride ?? _stat?.size;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

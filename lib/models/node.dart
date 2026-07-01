@@ -1,6 +1,6 @@
 class Node {
-  final String key;
-  final String label;
+  String key;
+  String label;
   final List<Node> children;
   bool isDir;
   DateTime? modifiedTime;
@@ -11,6 +11,7 @@ class Node {
   int deepFileCount;
   int deepFolderCount;
   final int mlocateIndex;
+  int? sizeOverride;
 
   Node({
     required this.key,
@@ -24,6 +25,7 @@ class Node {
     this.deepFileCount = 0,
     this.deepFolderCount = 0,
     this.mlocateIndex = 0,
+    this.sizeOverride,
   });
 
   Map<String, dynamic> toJson() {
@@ -38,6 +40,7 @@ class Node {
       'subFolderCount': subFolderCount,
       'deepFileCount': deepFileCount,
       'deepFolderCount': deepFolderCount,
+      if (sizeOverride != null) 'sizeOverride': sizeOverride,
     };
   }
 
@@ -58,6 +61,7 @@ class Node {
       subFolderCount: json['subFolderCount'] as int? ?? 0,
       deepFileCount: json['deepFileCount'] as int? ?? 0,
       deepFolderCount: json['deepFolderCount'] as int? ?? 0,
+      sizeOverride: json['sizeOverride'] as int?,
     );
   }
 }
