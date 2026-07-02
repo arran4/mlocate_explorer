@@ -71,6 +71,101 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
 
   final TextEditingController _pathController = TextEditingController();
 
+  Future<void> _createNewNode(Node targetDir, bool isDir) async {
+    final nameController = TextEditingController();
+    try {
+      final name = await showDialog<String>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: Text(isDir ? 'Create Folder' : 'Create File'),
+            content: TextField(
+              controller: nameController,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Name',
+                hintText: 'Enter name',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(nameController.text),
+                child: const Text('Create'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (name != null && name.trim().isNotEmpty) {
+        final trimmedName = name.trim();
+
+        // Validate name does not contain path separators
+        if (trimmedName.contains('/')) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Name cannot contain "/"')),
+            );
+          }
+          return;
+        }
+
+        // Check for duplicates
+        final exists =
+            targetDir.children.any((child) => child.label == trimmedName);
+        if (exists) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                  content:
+                      Text('An item named "$trimmedName" already exists.')),
+            );
+          }
+          return;
+        }
+
+        final newKey = targetDir.key == '/'
+            ? '/$trimmedName'
+            : '${targetDir.key}/$trimmedName';
+        final newNode = Node(
+          key: newKey,
+          label: trimmedName,
+          isDir: isDir,
+          modifiedTime: DateTime.now(),
+        );
+
+        setState(() {
+          targetDir.children.add(newNode);
+          _searchIndex.clear();
+          _hiddenKeys.clear();
+          if (rootNode != null) {
+            final ancestors = _findStackToPath(rootNode!, targetDir.key, []);
+            if (ancestors != null) {
+              for (final ancestor in ancestors) {
+                if (isDir) {
+                  ancestor.deepFolderCount += 1;
+                } else {
+                  ancestor.deepFileCount += 1;
+                }
+              }
+            }
+            if (isDir) {
+              targetDir.subFolderCount += 1;
+            } else {
+              targetDir.subFileCount += 1;
+            }
+          }
+        });
+      }
+    } finally {
+      nameController.dispose();
+    }
+  }
+
   // Locate state
   bool _isLocateMode = false;
   final TextEditingController _locateController = TextEditingController();
@@ -1131,7 +1226,11 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
           if (currentNode != null)
             PopupMenuButton<String>(
               onSelected: (value) {
-                if (value == 'export_dir') {
+                if (value == 'create_file') {
+                  _createNewNode(currentNode, false);
+                } else if (value == 'create_folder') {
+                  _createNewNode(currentNode, true);
+                } else if (value == 'export_dir') {
                   _exportDirectory(currentNode);
                 } else if (value == 'export_tree') {
                   _exportDirectoryTree(currentNode);
@@ -1148,6 +1247,15 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                 }
               },
               itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                const PopupMenuItem<String>(
+                  value: 'create_file',
+                  child: Text('Create File'),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'create_folder',
+                  child: Text('Create Folder'),
+                ),
+                const PopupMenuDivider(),
                 PopupMenuItem<String>(
                   value: 'toggle_hidden',
                   child: Text(
@@ -1575,6 +1683,16 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                           if (listNode.isDir) ...[
                                             const PopupMenuDivider(),
                                             const PopupMenuItem<String>(
+                                              value: 'create_file_inside',
+                                              child: Text('Create File Inside'),
+                                            ),
+                                            const PopupMenuItem<String>(
+                                              value: 'create_folder_inside',
+                                              child:
+                                                  Text('Create Folder Inside'),
+                                            ),
+                                            const PopupMenuDivider(),
+                                            const PopupMenuItem<String>(
                                               value: 'export_dir',
                                               child: Text('Export Directory'),
                                             ),
@@ -1587,7 +1705,12 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                         ],
                                       ).then((value) {
                                         if (!mounted) return;
-                                        if (value == 'toggle_opened') {
+                                        if (value == 'create_file_inside') {
+                                          _createNewNode(listNode, false);
+                                        } else if (value ==
+                                            'create_folder_inside') {
+                                          _createNewNode(listNode, true);
+                                        } else if (value == 'toggle_opened') {
                                           setState(() {
                                             listNode.isOpened =
                                                 !listNode.isOpened;
@@ -1634,45 +1757,10 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                                     return false;
                                                   }
 
-                                                  void recalculateCounts(
-                                                      Node node) {
-                                                    if (!node.isDir) return;
-                                                    int subFiles = 0;
-                                                    int subFolders = 0;
-                                                    int deepFiles = 0;
-                                                    int deepFolders = 0;
-
-                                                    for (var child
-                                                        in node.children) {
-                                                      if (child.isDir) {
-                                                        subFolders++;
-                                                        deepFolders++;
-                                                        recalculateCounts(
-                                                            child);
-                                                        deepFiles +=
-                                                            child.deepFileCount;
-                                                        deepFolders += child
-                                                            .deepFolderCount;
-                                                      } else {
-                                                        subFiles++;
-                                                        deepFiles++;
-                                                      }
-                                                    }
-
-                                                    node.subFileCount =
-                                                        subFiles;
-                                                    node.subFolderCount =
-                                                        subFolders;
-                                                    node.deepFileCount =
-                                                        deepFiles;
-                                                    node.deepFolderCount =
-                                                        deepFolders;
-                                                  }
-
                                                   if (rootNode != null) {
                                                     removeRecursively(
                                                         rootNode!);
-                                                    recalculateCounts(
+                                                    _recalculateCounts(
                                                         rootNode!);
                                                   }
                                                 });
@@ -1743,6 +1831,32 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         ],
       ),
     );
+  }
+
+  void _recalculateCounts(Node node) {
+    if (!node.isDir) return;
+    int subFiles = 0;
+    int subFolders = 0;
+    int deepFiles = 0;
+    int deepFolders = 0;
+
+    for (var child in node.children) {
+      if (child.isDir) {
+        subFolders++;
+        deepFolders++;
+        _recalculateCounts(child);
+        deepFiles += child.deepFileCount;
+        deepFolders += child.deepFolderCount;
+      } else {
+        subFiles++;
+        deepFiles++;
+      }
+    }
+
+    node.subFileCount = subFiles;
+    node.subFolderCount = subFolders;
+    node.deepFileCount = deepFiles;
+    node.deepFolderCount = deepFolders;
   }
 
   void _scrollToSelectedIndex() {
