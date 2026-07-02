@@ -73,67 +73,96 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
 
   Future<void> _createNewNode(Node targetDir, bool isDir) async {
     final nameController = TextEditingController();
-    final name = await showDialog<String>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(isDir ? 'Create Folder' : 'Create File'),
-          content: TextField(
-            controller: nameController,
-            autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'Name',
-              hintText: 'Enter name',
+    try {
+      final name = await showDialog<String>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: Text(isDir ? 'Create Folder' : 'Create File'),
+            content: TextField(
+              controller: nameController,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Name',
+                hintText: 'Enter name',
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(nameController.text),
-              child: const Text('Create'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (name != null && name.trim().isNotEmpty) {
-      final trimmedName = name.trim();
-
-      // Check for duplicates
-      final exists =
-          targetDir.children.any((child) => child.label == trimmedName);
-      if (exists) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text('An item named "$trimmedName" already exists.')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(nameController.text),
+                child: const Text('Create'),
+              ),
+            ],
           );
-        }
-        return;
-      }
-
-      final newKey = targetDir.key == '/'
-          ? '/$trimmedName'
-          : '${targetDir.key}/$trimmedName';
-      final newNode = Node(
-        key: newKey,
-        label: trimmedName,
-        isDir: isDir,
-        modifiedTime: DateTime.now(),
+        },
       );
 
-      setState(() {
-        targetDir.children.add(newNode);
-        _searchIndex.clear();
-        _hiddenKeys.clear();
-        if (rootNode != null) {
-          _recalculateCounts(rootNode!);
+      if (name != null && name.trim().isNotEmpty) {
+        final trimmedName = name.trim();
+
+        // Validate name does not contain path separators
+        if (trimmedName.contains('/')) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Name cannot contain "/"')),
+            );
+          }
+          return;
         }
-      });
+
+        // Check for duplicates
+        final exists =
+            targetDir.children.any((child) => child.label == trimmedName);
+        if (exists) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                  content:
+                      Text('An item named "$trimmedName" already exists.')),
+            );
+          }
+          return;
+        }
+
+        final newKey = targetDir.key == '/'
+            ? '/$trimmedName'
+            : '${targetDir.key}/$trimmedName';
+        final newNode = Node(
+          key: newKey,
+          label: trimmedName,
+          isDir: isDir,
+          modifiedTime: DateTime.now(),
+        );
+
+        setState(() {
+          targetDir.children.add(newNode);
+          _searchIndex.clear();
+          _hiddenKeys.clear();
+          if (rootNode != null) {
+            final ancestors = _findStackToPath(rootNode!, targetDir.key, []);
+            if (ancestors != null) {
+              for (final ancestor in ancestors) {
+                if (isDir) {
+                  ancestor.deepFolderCount += 1;
+                } else {
+                  ancestor.deepFileCount += 1;
+                }
+              }
+            }
+            if (isDir) {
+              targetDir.subFolderCount += 1;
+            } else {
+              targetDir.subFileCount += 1;
+            }
+          }
+        });
+      }
+    } finally {
+      nameController.dispose();
     }
   }
 
