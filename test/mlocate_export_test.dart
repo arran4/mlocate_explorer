@@ -171,7 +171,7 @@ void main() {
       }
 
       final zipData = ZipEncoder().encode(archive);
-      final decodedArchive = ZipDecoder().decodeBytes(zipData!);
+      final decodedArchive = ZipDecoder().decodeBytes(zipData);
 
       expect(decodedArchive.length, 2);
       expect(decodedArchive[0].name, 'folder2/');

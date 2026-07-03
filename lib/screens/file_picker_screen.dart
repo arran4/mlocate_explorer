@@ -855,16 +855,17 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         }
 
         try {
-          final archiveData = await Isolate.run(() {
+          final archiveData = await Isolate.run<List<int>?>(() {
             if (format == 'tar') {
               return TarEncoder().encode(archive);
             } else {
               return ZipEncoder().encode(archive);
             }
           });
-          if (archiveData != null) {
-            await File(savePath).writeAsBytes(archiveData);
+          if (archiveData == null) {
+            throw Exception('Encoder returned empty data');
           }
+          await File(savePath).writeAsBytes(archiveData);
         } catch (e) {
           if (mounted && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -1064,16 +1065,17 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         }
 
         try {
-          final archiveData = await Isolate.run(() {
+          final archiveData = await Isolate.run<List<int>?>(() {
             if (format == 'tar') {
               return TarEncoder().encode(archive);
             } else {
               return ZipEncoder().encode(archive);
             }
           });
-          if (archiveData != null) {
-            await File(savePath).writeAsBytes(archiveData);
+          if (archiveData == null) {
+            throw Exception('Encoder returned empty data');
           }
+          await File(savePath).writeAsBytes(archiveData);
         } catch (e) {
           if (mounted && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
