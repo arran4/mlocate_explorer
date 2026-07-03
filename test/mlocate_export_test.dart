@@ -118,7 +118,7 @@ void main() {
       }
 
       for (final child in rootNode.children) {
-          addNodeToArchive(child, '');
+        addNodeToArchive(child, '');
       }
 
       final tarData = TarEncoder().encode(archive);
@@ -167,7 +167,7 @@ void main() {
       }
 
       for (final child in rootNode.children) {
-          addNodeToArchive(child, '');
+        addNodeToArchive(child, '');
       }
 
       final zipData = ZipEncoder().encode(archive);
