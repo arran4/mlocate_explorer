@@ -39,6 +39,7 @@ dependencies:
   flutter_treeview: ^1.0.7+1
   dartobjectutils: ^0.1.1
   glob: ^2.1.3
+  archive: ^4.0.9
 
 dev_dependencies:
   flutter_test:

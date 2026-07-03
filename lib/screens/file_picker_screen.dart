@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:glob/glob.dart';
+import 'package:archive/archive.dart';
 
 import '../models/node.dart';
 import '../services/mlocate_db_parser.dart';
@@ -748,6 +749,16 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                 subtitle: const Text('Binary mlocate database format'),
                 onTap: () => Navigator.of(context).pop('mlocate'),
               ),
+              ListTile(
+                title: const Text('tar (empty files)'),
+                subtitle: const Text('Tar archive preserving directory structure with empty files'),
+                onTap: () => Navigator.of(context).pop('tar'),
+              ),
+              ListTile(
+                title: const Text('zip (empty files)'),
+                subtitle: const Text('Zip archive preserving directory structure with empty files'),
+                onTap: () => Navigator.of(context).pop('zip'),
+              ),
             ],
           ),
         );
@@ -765,7 +776,11 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         ? 'json'
         : format == 'mlocate'
             ? 'db'
-            : 'txt';
+            : format == 'tar'
+                ? 'tar'
+                : format == 'zip'
+                    ? 'zip'
+                    : 'txt';
     final savePath = await FilePicker.platform.saveFile(
       dialogTitle: 'Export Directory',
       fileName: 'directory_export.$ext',
@@ -811,6 +826,45 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         try {
           final writer = MlocateDBWriter(savePath, clonedNode);
           await Isolate.run(() => writer.write());
+        } catch (e) {
+          if (mounted && context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to export directory: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+      } else if (format == 'tar' || format == 'zip') {
+        final archive = Archive();
+        for (final child in node.children) {
+          if (!_showHiddenFiles &&
+              child.label.startsWith('.') &&
+              child.label != '.' &&
+              child.label != '..') {
+            continue;
+          }
+          final path = child.label + (child.isDir ? '/' : '');
+          final file = ArchiveFile(path, 0, <int>[]);
+          if (child.modifiedTime != null) {
+            file.lastModTime = child.modifiedTime!.millisecondsSinceEpoch ~/ 1000;
+          }
+          archive.addFile(file);
+        }
+
+        try {
+          final archiveData = await Isolate.run(() {
+            if (format == 'tar') {
+              return TarEncoder().encode(archive);
+            } else {
+              return ZipEncoder().encode(archive);
+            }
+          });
+          if (archiveData != null) {
+            await File(savePath).writeAsBytes(archiveData);
+          }
         } catch (e) {
           if (mounted && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -928,7 +982,11 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         ? 'json'
         : format == 'mlocate'
             ? 'db'
-            : 'txt';
+            : format == 'tar'
+                ? 'tar'
+                : format == 'zip'
+                    ? 'zip'
+                    : 'txt';
     final savePath = await FilePicker.platform.saveFile(
       dialogTitle: 'Export Directory Tree',
       fileName: 'directory_tree_export.$ext',
@@ -966,6 +1024,56 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         try {
           final writer = MlocateDBWriter(savePath, cloneTree(node));
           await Isolate.run(() => writer.write());
+        } catch (e) {
+          if (mounted && context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to export directory tree: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+      } else if (format == 'tar' || format == 'zip') {
+        final archive = Archive();
+
+        void addNodeToArchive(Node n, String basePath) {
+          if (!_showHiddenFiles &&
+              n.label.startsWith('.') &&
+              n.label != '.' &&
+              n.label != '..') {
+            return;
+          }
+          final path = basePath.isEmpty ? n.label : '$basePath/${n.label}';
+          final finalPath = path + (n.isDir ? '/' : '');
+
+          final file = ArchiveFile(finalPath, 0, <int>[]);
+          if (n.modifiedTime != null) {
+            file.lastModTime = n.modifiedTime!.millisecondsSinceEpoch ~/ 1000;
+          }
+          archive.addFile(file);
+
+          for (final child in n.children) {
+            addNodeToArchive(child, path);
+          }
+        }
+
+        for (final child in node.children) {
+          addNodeToArchive(child, '');
+        }
+
+        try {
+          final archiveData = await Isolate.run(() {
+            if (format == 'tar') {
+              return TarEncoder().encode(archive);
+            } else {
+              return ZipEncoder().encode(archive);
+            }
+          });
+          if (archiveData != null) {
+            await File(savePath).writeAsBytes(archiveData);
+          }
         } catch (e) {
           if (mounted && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
