@@ -45,3 +45,4 @@ app.*.map.json
 hexdump100.txt
 /directory_*.json
 /directory_*.txt
+/exported.db
