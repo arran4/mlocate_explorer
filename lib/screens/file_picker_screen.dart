@@ -210,10 +210,18 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     ];
 
     String? foundPath;
+    String? errorMessage;
     for (final p in possiblePaths) {
-      if (await File(p).exists()) {
-        foundPath = p;
-        break;
+      final file = File(p);
+      try {
+        if (await file.exists()) {
+          final openedFile = await file.open(mode: FileMode.read);
+          await openedFile.close();
+          foundPath = p;
+          break;
+        }
+      } on FileSystemException catch (e) {
+        errorMessage = "Permission denied or error reading $p: ${e.message}";
       }
     }
 
@@ -228,8 +236,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
+          SnackBar(
+            content: Text(errorMessage ??
                 'Could not find system database (/var/lib/mlocate/mlocate.db or plocate.db)'),
           ),
         );
