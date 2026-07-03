@@ -751,12 +751,14 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
               ),
               ListTile(
                 title: const Text('tar (empty files)'),
-                subtitle: const Text('Tar archive preserving directory structure with empty files'),
+                subtitle: const Text(
+                    'Tar archive preserving directory structure with empty files'),
                 onTap: () => Navigator.of(context).pop('tar'),
               ),
               ListTile(
                 title: const Text('zip (empty files)'),
-                subtitle: const Text('Zip archive preserving directory structure with empty files'),
+                subtitle: const Text(
+                    'Zip archive preserving directory structure with empty files'),
                 onTap: () => Navigator.of(context).pop('zip'),
               ),
             ],
@@ -849,7 +851,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
           final path = child.label + (child.isDir ? '/' : '');
           final file = ArchiveFile(path, 0, <int>[]);
           if (child.modifiedTime != null) {
-            file.lastModTime = child.modifiedTime!.millisecondsSinceEpoch ~/ 1000;
+            file.lastModTime =
+                child.modifiedTime!.millisecondsSinceEpoch ~/ 1000;
           }
           archive.addFile(file);
         }
