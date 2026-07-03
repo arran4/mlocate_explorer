@@ -203,6 +203,40 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     }
   }
 
+  Future<void> _openSystemDb() async {
+    final possiblePaths = [
+      '/var/lib/mlocate/mlocate.db',
+      '/var/lib/plocate/plocate.db',
+    ];
+
+    String? foundPath;
+    for (final p in possiblePaths) {
+      if (await File(p).exists()) {
+        foundPath = p;
+        break;
+      }
+    }
+
+    if (foundPath != null) {
+      setState(() {
+        filePath = foundPath;
+        _isLoading = true;
+        _loadingProgress = null;
+        _loadingStatus = 'Opening...';
+      });
+      _parseDatabase();
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Could not find system database (/var/lib/mlocate/mlocate.db or plocate.db)'),
+          ),
+        );
+      }
+    }
+  }
+
   void _closeDatabase() {
     setState(() {
       rootNode = null;
@@ -1244,6 +1278,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                   });
                 } else if (value == 'export_whole_db') {
                   _exportWholeDb();
+                } else if (value == 'open_system_db') {
+                  _openSystemDb();
                 }
               },
               itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
@@ -1278,6 +1314,10 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                   child: Text('Export Directory Tree'),
                 ),
                 const PopupMenuDivider(),
+                const PopupMenuItem<String>(
+                  value: 'open_system_db',
+                  child: Text('Open System DB'),
+                ),
                 const PopupMenuItem<String>(
                   value: 'reload_db',
                   child: Text('Reload Database'),
@@ -1540,9 +1580,19 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                       ],
                     )
                   : currentNode == null
-                      ? ElevatedButton(
-                          onPressed: _pickFile,
-                          child: const Text('Pick mlocate.db File'),
+                      ? Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            ElevatedButton(
+                              onPressed: _pickFile,
+                              child: const Text('Pick mlocate.db File'),
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _openSystemDb,
+                              child: const Text('Open System DB'),
+                            ),
+                          ],
                         )
                       : _isLocateMode
                           ? Column(
