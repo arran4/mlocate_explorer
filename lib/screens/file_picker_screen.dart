@@ -682,31 +682,154 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
   Future<void> _exportWholeDb() async {
     if (rootNode == null) return;
 
+    final format = await _showExportFormatDialog(true);
+    if (format == null) {
+      return;
+    }
+
+    final ext = format == 'json'
+        ? 'json'
+        : format == 'mlocate'
+            ? 'db'
+            : format == 'tar'
+                ? 'tar'
+                : format == 'zip'
+                    ? 'zip'
+                    : 'txt';
+
     final savePath = await FilePicker.platform.saveFile(
-      dialogTitle: 'Export Whole DB as mlocate.db',
-      fileName: 'exported.db',
+      dialogTitle: 'Export Whole DB',
+      fileName: 'exported.$ext',
     );
 
     if (savePath != null) {
-      try {
-        // Direct export using rootNode without filtering
-        final writer = MlocateDBWriter(savePath, rootNode!);
-        await Isolate.run(() => writer.write());
+      if (format == 'mlocate') {
+        try {
+          // Direct export using rootNode without filtering
+          final writer = MlocateDBWriter(savePath, rootNode!);
+          await Isolate.run(() => writer.write());
 
+          if (mounted && context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Exported database to $savePath'),
+              ),
+            );
+          }
+        } catch (e) {
+          if (mounted && context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to export database: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      } else if (format == 'tar' || format == 'zip') {
+        final archive = Archive();
+
+        void addNodeToArchive(Node n, String basePath) {
+          if (!_showHiddenFiles &&
+              n.label.startsWith('.') &&
+              n.label != '.' &&
+              n.label != '..') {
+            return;
+          }
+          final path = basePath.isEmpty ? n.label : '$basePath/${n.label}';
+          final finalPath = path + (n.isDir ? '/' : '');
+
+          final file = ArchiveFile(finalPath, 0, <int>[]);
+          if (n.modifiedTime != null) {
+            file.lastModTime = n.modifiedTime!.millisecondsSinceEpoch ~/ 1000;
+          }
+          archive.addFile(file);
+
+          for (final child in n.children) {
+            addNodeToArchive(child, path);
+          }
+        }
+
+        for (final child in rootNode!.children) {
+          addNodeToArchive(child, '');
+        }
+
+        try {
+          final archiveFormat = format;
+          final archiveData = await Isolate.run<List<int>?>(() {
+            if (archiveFormat == 'tar') {
+              return TarEncoder().encode(archive);
+            } else {
+              return ZipEncoder().encode(archive);
+            }
+          });
+          if (archiveData == null) {
+            throw Exception('Encoder returned empty data');
+          }
+          await File(savePath).writeAsBytes(archiveData);
+          if (mounted && context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Exported database to $savePath'),
+              ),
+            );
+          }
+        } catch (e) {
+          if (mounted && context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to export database: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      } else if (format == 'json') {
+        Map<String, dynamic> serializeNode(Node n) {
+          final childrenList = <Map<String, dynamic>>[];
+          for (final child in n.children) {
+            if (!_showHiddenFiles &&
+                child.label.startsWith('.') &&
+                child.label != '.' &&
+                child.label != '..') {
+              continue;
+            }
+            childrenList.add(serializeNode(child));
+          }
+          return {
+            'key': n.key,
+            'label': n.label,
+            'isDir': n.isDir,
+            'modifiedTime': n.modifiedTime?.toIso8601String(),
+            'isOpened': n.isOpened,
+            'subFileCount': n.subFileCount,
+            'subFolderCount': n.subFolderCount,
+            'deepFileCount': n.deepFileCount,
+            'deepFolderCount': n.deepFolderCount,
+            'children': childrenList,
+          };
+        }
+
+        final Map<String, dynamic> data = serializeNode(rootNode!);
+        await File(savePath).writeAsString(jsonEncode(data));
         if (mounted && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Exported database to $savePath'),
-            ),
+            SnackBar(content: Text('Exported database to $savePath')),
           );
         }
-      } catch (e) {
+      } else {
+        final buffer = StringBuffer();
+        if (format == 'ascii') {
+          _collectTreeAscii(rootNode!, buffer, "", true, true);
+        } else {
+          for (final child in rootNode!.children) {
+            _collectTree(child, buffer);
+          }
+        }
+        await File(savePath).writeAsString(buffer.toString());
         if (mounted && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to export database: $e'),
-              backgroundColor: Colors.red,
-            ),
+            SnackBar(content: Text('Exported database to $savePath')),
           );
         }
       }
@@ -858,8 +981,9 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         }
 
         try {
+          final archiveFormat = format;
           final archiveData = await Isolate.run<List<int>?>(() {
-            if (format == 'tar') {
+            if (archiveFormat == 'tar') {
               return TarEncoder().encode(archive);
             } else {
               return ZipEncoder().encode(archive);
@@ -1068,8 +1192,9 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         }
 
         try {
+          final archiveFormat = format;
           final archiveData = await Isolate.run<List<int>?>(() {
-            if (format == 'tar') {
+            if (archiveFormat == 'tar') {
               return TarEncoder().encode(archive);
             } else {
               return ZipEncoder().encode(archive);
