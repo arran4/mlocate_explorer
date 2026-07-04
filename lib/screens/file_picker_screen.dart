@@ -728,9 +728,10 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         }
       } else if (format == 'tar' || format == 'zip') {
         final archive = Archive();
+        final showHidden = _showHiddenFiles;
 
         void addNodeToArchive(Node n, String basePath) {
-          if (!_showHiddenFiles &&
+          if (!showHidden &&
               n.label.startsWith('.') &&
               n.label != '.' &&
               n.label != '..') {
@@ -964,8 +965,9 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         }
       } else if (format == 'tar' || format == 'zip') {
         final archive = Archive();
+        final showHidden = _showHiddenFiles;
         for (final child in node.children) {
-          if (!_showHiddenFiles &&
+          if (!showHidden &&
               child.label.startsWith('.') &&
               child.label != '.' &&
               child.label != '..') {
@@ -1165,9 +1167,10 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         }
       } else if (format == 'tar' || format == 'zip') {
         final archive = Archive();
+        final showHidden = _showHiddenFiles;
 
         void addNodeToArchive(Node n, String basePath) {
-          if (!_showHiddenFiles &&
+          if (!showHidden &&
               n.label.startsWith('.') &&
               n.label != '.' &&
               n.label != '..') {
