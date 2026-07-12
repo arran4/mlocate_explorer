@@ -444,57 +444,13 @@ jobs:
             echo "tag_name=v$VERSION" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Determine discussion category
-        id: discussion
-        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          repo_info=$(gh repo view --json owner,name,hasDiscussionsEnabled --jq '.owner.login + " " + .name + " " + (.hasDiscussionsEnabled|tostring)' || echo "")
-          if [ -n "$repo_info" ]; then
-            owner=${repo_info%% *}
-            rest=${repo_info#* }
-            name=${rest%% *}
-            enabled=${rest#* }
-            if [ "$enabled" = "true" ]; then
-              categories=$(gh api graphql -F owner="$owner" -F name="$name" -f query='
-                query($owner: String!, $name: String!) {
-                  repository(owner: $owner, name: $name) {
-                    discussionCategories(first: 10) {
-                      nodes {
-                        name
-                      }
-                    }
-                  }
-                }' --jq '.data.repository.discussionCategories.nodes[].name')
-              if echo "$categories" | grep -q "^Announcements$"; then
-                echo "category=Announcements" >> "$GITHUB_OUTPUT"
-              elif echo "$categories" | grep -q "^General$"; then
-                echo "category=General" >> "$GITHUB_OUTPUT"
-              fi
-            fi
-          fi
-
-      - name: Publish GitHub release (with discussion)
+      - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
-        if: steps.discussion.outputs.category != ''
         with:
           tag_name: ${{ steps.get_version.outputs.tag_name || github.ref_name }}
           draft: false
           generate_release_notes: true
-          discussion_category_name: ${{ steps.discussion.outputs.category }}
-          files: dist-release/**
-          fail_on_unmatched_files: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish GitHub release (no discussion)
-        uses: softprops/action-gh-release@v2
-        if: steps.discussion.outputs.category == ''
-        with:
-          tag_name: ${{ steps.get_version.outputs.tag_name || github.ref_name }}
-          draft: false
-          generate_release_notes: true
+          discussion_category_name: 'Announcements'
           files: dist-release/**
           fail_on_unmatched_files: true
         env:
