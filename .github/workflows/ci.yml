@@ -475,13 +475,26 @@ jobs:
             fi
           fi
 
-      - name: Publish GitHub release
+      - name: Publish GitHub release (with discussion)
         uses: softprops/action-gh-release@v2
+        if: steps.discussion.outputs.category != ''
         with:
           tag_name: ${{ steps.get_version.outputs.tag_name || github.ref_name }}
           draft: false
           generate_release_notes: true
           discussion_category_name: ${{ steps.discussion.outputs.category }}
+          files: dist-release/**
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish GitHub release (no discussion)
+        uses: softprops/action-gh-release@v2
+        if: steps.discussion.outputs.category == ''
+        with:
+          tag_name: ${{ steps.get_version.outputs.tag_name || github.ref_name }}
+          draft: false
+          generate_release_notes: true
           files: dist-release/**
           fail_on_unmatched_files: true
         env:
