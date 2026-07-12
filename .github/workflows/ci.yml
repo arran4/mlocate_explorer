@@ -89,7 +89,7 @@ jobs:
           fi
 
       - name: Create PR for formatting fixes
-        if: steps.format.outputs.changes == 'true' && (github.event_name != 'workflow_dispatch' || github.event.inputs.allow_prs != 'false')
+        if: steps.format.outputs.changes == 'true' && github.event_name == 'workflow_dispatch' && github.event.inputs.allow_prs == 'true'
         uses: peter-evans/create-pull-request@v7
         continue-on-error: true
         with:
@@ -104,7 +104,11 @@ jobs:
       - name: Fail if formatting issues existed
         if: steps.format.outputs.changes == 'true'
         run: |
-          echo "Formatting issues detected. A PR has been created (if allowed) with the fixes."
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.allow_prs }}" == "true" ]]; then
+            echo "Formatting issues detected. A PR has been created with the fixes."
+          else
+            echo "Formatting issues detected. Please run 'dart format .' locally, or trigger this workflow manually with allow_prs=true to auto-create a PR."
+          fi
           exit 1
 
   flutter-analyze:
