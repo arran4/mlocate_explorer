@@ -4,6 +4,7 @@ import 'package:mlocate_explorer/models/node.dart';
 import 'package:mlocate_explorer/services/mlocate_db_parser.dart';
 import 'package:mlocate_explorer/services/mlocate_db_writer.dart';
 import 'package:path/path.dart' as p;
+import 'package:archive/archive.dart';
 
 void main() {
   group('Mlocate Export', () {
@@ -79,6 +80,104 @@ void main() {
 
       // Clean up
       tempDir.deleteSync(recursive: true);
+    });
+
+    test('Exports directory tree as TAR with empty files', () async {
+      final rootNode = Node(
+        key: '/mock_root',
+        label: 'mock_root',
+        isDir: true,
+        children: [
+          Node(
+            key: '/mock_root/folder1',
+            label: 'folder1',
+            isDir: true,
+            children: [
+              Node(
+                key: '/mock_root/folder1/file1.txt',
+                label: 'file1.txt',
+                isDir: false,
+              ),
+            ],
+          ),
+        ],
+      );
+
+      final archive = Archive();
+      void addNodeToArchive(Node n, String basePath) {
+        final path = basePath.isEmpty ? n.label : '$basePath/${n.label}';
+        final finalPath = path + (n.isDir ? '/' : '');
+        final file = ArchiveFile(finalPath, 0, <int>[]);
+        if (n.modifiedTime != null) {
+          file.lastModTime = n.modifiedTime!.millisecondsSinceEpoch ~/ 1000;
+        }
+        archive.addFile(file);
+        for (final child in n.children) {
+          addNodeToArchive(child, path);
+        }
+      }
+
+      for (final child in rootNode.children) {
+        addNodeToArchive(child, '');
+      }
+
+      final tarData = TarEncoder().encode(archive);
+      final decodedArchive = TarDecoder().decodeBytes(tarData);
+
+      expect(decodedArchive.length, 2);
+      expect(decodedArchive[0].name, 'folder1/');
+      expect(decodedArchive[0].size, 0);
+      expect(decodedArchive[1].name, 'folder1/file1.txt');
+      expect(decodedArchive[1].size, 0);
+    });
+
+    test('Exports directory tree as ZIP with empty files', () async {
+      final rootNode = Node(
+        key: '/mock_root',
+        label: 'mock_root',
+        isDir: true,
+        children: [
+          Node(
+            key: '/mock_root/folder2',
+            label: 'folder2',
+            isDir: true,
+            children: [
+              Node(
+                key: '/mock_root/folder2/file2.txt',
+                label: 'file2.txt',
+                isDir: false,
+              ),
+            ],
+          ),
+        ],
+      );
+
+      final archive = Archive();
+      void addNodeToArchive(Node n, String basePath) {
+        final path = basePath.isEmpty ? n.label : '$basePath/${n.label}';
+        final finalPath = path + (n.isDir ? '/' : '');
+        final file = ArchiveFile(finalPath, 0, <int>[]);
+        if (n.modifiedTime != null) {
+          file.lastModTime = n.modifiedTime!.millisecondsSinceEpoch ~/ 1000;
+        }
+        archive.addFile(file);
+        for (final child in n.children) {
+          addNodeToArchive(child, path);
+        }
+      }
+
+      for (final child in rootNode.children) {
+        addNodeToArchive(child, '');
+      }
+
+      final zipData = ZipEncoder().encode(archive);
+      final decodedArchive = ZipDecoder().decodeBytes(zipData);
+
+      expect(decodedArchive.length, 2);
+      expect(decodedArchive[0].name, 'folder2/');
+      expect(decodedArchive[0].size, 0);
+      expect(decodedArchive[1].name, 'folder2/file2.txt');
+      expect(decodedArchive[1].size, 0);
     });
   });
 }
