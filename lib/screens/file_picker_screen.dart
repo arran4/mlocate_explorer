@@ -3,6 +3,7 @@ import 'dart:isolate';
 
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
@@ -23,6 +24,12 @@ List<int>? _encodeArchive(List<dynamic> args) {
   } else {
     return ZipEncoder().encode(archive);
   }
+}
+
+void _writeMlocateDb(List<dynamic> args) {
+  final filePath = args[0] as String;
+  final rootNode = args[1] as Node;
+  MlocateDBWriter(filePath, rootNode).write();
 }
 
 void _parseIsolateEntry(Map<String, dynamic> args) {
@@ -717,8 +724,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       if (format == 'mlocate') {
         try {
           // Direct export using rootNode without filtering
-          final writer = MlocateDBWriter(savePath, rootNode!);
-          await Isolate.run(() => writer.write());
+          await compute(_writeMlocateDb, [savePath, rootNode!]);
 
           if (mounted && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -767,9 +773,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         }
 
         try {
-          final archiveData = await Isolate.run<List<int>?>(
-            () => _encodeArchive([archive, format]),
-          );
+          final archiveData = await compute(_encodeArchive, [archive, format]);
           if (archiveData == null) {
             throw Exception('Encoder returned empty data');
           }
@@ -956,8 +960,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         );
 
         try {
-          final writer = MlocateDBWriter(savePath, clonedNode);
-          await Isolate.run(() => writer.write());
+          await compute(_writeMlocateDb, [savePath, clonedNode]);
         } catch (e) {
           if (mounted && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -989,9 +992,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         }
 
         try {
-          final archiveData = await Isolate.run<List<int>?>(
-            () => _encodeArchive([archive, format]),
-          );
+          final archiveData = await compute(_encodeArchive, [archive, format]);
           if (archiveData == null) {
             throw Exception('Encoder returned empty data');
           }
@@ -1153,8 +1154,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         }
 
         try {
-          final writer = MlocateDBWriter(savePath, cloneTree(node));
-          await Isolate.run(() => writer.write());
+          await compute(_writeMlocateDb, [savePath, cloneTree(node)]);
         } catch (e) {
           if (mounted && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -1196,9 +1196,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         }
 
         try {
-          final archiveData = await Isolate.run<List<int>?>(
-            () => _encodeArchive([archive, format]),
-          );
+          final archiveData = await compute(_encodeArchive, [archive, format]);
           if (archiveData == null) {
             throw Exception('Encoder returned empty data');
           }
