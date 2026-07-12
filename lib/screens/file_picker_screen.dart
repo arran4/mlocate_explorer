@@ -12,7 +12,18 @@ import 'package:archive/archive.dart';
 import '../models/node.dart';
 import '../services/mlocate_db_parser.dart';
 import '../services/mlocate_db_writer.dart';
+
 import '../widgets/modify_node_dialog.dart';
+
+List<int>? _encodeArchive(List<dynamic> args) {
+  final archive = args[0] as Archive;
+  final format = args[1] as String;
+  if (format == 'tar') {
+    return TarEncoder().encode(archive);
+  } else {
+    return ZipEncoder().encode(archive);
+  }
+}
 
 void _parseIsolateEntry(Map<String, dynamic> args) {
   SendPort sendPort = args['sendPort'];
@@ -756,14 +767,9 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         }
 
         try {
-          final archiveFormat = format;
-          final archiveData = await Isolate.run<List<int>?>(() {
-            if (archiveFormat == 'tar') {
-              return TarEncoder().encode(archive);
-            } else {
-              return ZipEncoder().encode(archive);
-            }
-          });
+          final archiveData = await Isolate.run<List<int>?>(
+            () => _encodeArchive([archive, format]),
+          );
           if (archiveData == null) {
             throw Exception('Encoder returned empty data');
           }
@@ -983,14 +989,9 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         }
 
         try {
-          final archiveFormat = format;
-          final archiveData = await Isolate.run<List<int>?>(() {
-            if (archiveFormat == 'tar') {
-              return TarEncoder().encode(archive);
-            } else {
-              return ZipEncoder().encode(archive);
-            }
-          });
+          final archiveData = await Isolate.run<List<int>?>(
+            () => _encodeArchive([archive, format]),
+          );
           if (archiveData == null) {
             throw Exception('Encoder returned empty data');
           }
@@ -1195,14 +1196,9 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         }
 
         try {
-          final archiveFormat = format;
-          final archiveData = await Isolate.run<List<int>?>(() {
-            if (archiveFormat == 'tar') {
-              return TarEncoder().encode(archive);
-            } else {
-              return ZipEncoder().encode(archive);
-            }
-          });
+          final archiveData = await Isolate.run<List<int>?>(
+            () => _encodeArchive([archive, format]),
+          );
           if (archiveData == null) {
             throw Exception('Encoder returned empty data');
           }
