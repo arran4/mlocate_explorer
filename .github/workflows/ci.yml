@@ -31,6 +31,7 @@ permissions:
   security-events: write
   pages: write
   id-token: write
+  actions: read
 
 jobs:
   route:
