@@ -84,8 +84,7 @@ class FileSystemScanner {
         if (isDir) {
           subFolders++;
           deepFolders++;
-          var (childDeepFiles, childDeepFolders) =
-              _scanDirectory(entity, node);
+          var (childDeepFiles, childDeepFolders) = _scanDirectory(entity, node);
           deepFiles += childDeepFiles;
           deepFolders += childDeepFolders;
         } else {
