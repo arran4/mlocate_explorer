@@ -59,22 +59,38 @@ void _scanFileSystemIsolateEntry(Map<String, dynamic> args) {
   SendPort sendPort = args['sendPort'];
   String directoryPath = args['directoryPath'];
 
-  var scanner = FileSystemScanner(
-    directoryPath,
-    onProgress: (progress, status) {
-      sendPort.send({
-        'type': 'progress',
-        'progress': progress,
-        'status': status,
-      });
-    },
-  );
-  scanner.scan();
-  sendPort.send({
-    'type': 'done',
-    'rootNode': scanner.rootNode,
-    'errors': scanner.errors,
-  });
+  try {
+    var scanner = FileSystemScanner(
+      directoryPath,
+      onProgress: (progress, status) {
+        sendPort.send({
+          'type': 'progress',
+          'progress': progress,
+          'status': status,
+        });
+      },
+    );
+    scanner.scan();
+    sendPort.send({
+      'type': 'done',
+      'rootNode': scanner.rootNode,
+      'errors': scanner.errors,
+    });
+  } catch (e) {
+    sendPort.send({
+      'type': 'done',
+      'rootNode': null,
+      'errors': [
+        {
+          'description': 'Fatal error during scan: $e',
+          'directoryPath': directoryPath,
+          'offset': 0,
+          'percentage': 0.0,
+          'hexDump': '',
+        }
+      ],
+    });
+  }
 }
 
 enum GroupOption { dirsFirst, filesFirst, none }

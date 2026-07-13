@@ -5,10 +5,9 @@ class FileSystemScanner {
   final String rootPath;
   Node? rootNode;
   int _nodeCounter = 0;
-  int _calculatedNodes = 0;
   DateTime _lastProgressTime = DateTime.now();
   final List<Map<String, dynamic>> errors = [];
-  final void Function(double progress, String status)? onProgress;
+  final void Function(double? progress, String status)? onProgress;
 
   FileSystemScanner(this.rootPath, {this.onProgress});
 
@@ -36,26 +35,29 @@ class FileSystemScanner {
       label: label,
       isDir: true,
       mlocateIndex: _nodeCounter++,
+      children: [],
     );
 
     _scanDirectory(dir, rootNode!);
-
-    if (rootNode != null) {
-      _calculateCounts(rootNode!);
-    }
   }
 
-  void _scanDirectory(Directory dir, Node parentNode) {
+  (int deepFiles, int deepFolders) _scanDirectory(
+      Directory dir, Node parentNode) {
     if (onProgress != null) {
       final now = DateTime.now();
       if (now.difference(_lastProgressTime).inMilliseconds >= 500) {
         _lastProgressTime = now;
         onProgress!(
-          0.5,
+          null,
           'Scanning file system ($_nodeCounter nodes found)...',
         );
       }
     }
+
+    int subFiles = 0;
+    int subFolders = 0;
+    int deepFiles = 0;
+    int deepFolders = 0;
 
     try {
       var entities = dir.listSync(recursive: false, followLinks: false);
@@ -74,12 +76,21 @@ class FileSystemScanner {
           isDir: isDir,
           modifiedTime: modifiedTime,
           mlocateIndex: _nodeCounter++,
+          children: [],
         );
 
         parentNode.children.add(node);
 
         if (isDir) {
-          _scanDirectory(entity, node);
+          subFolders++;
+          deepFolders++;
+          var (childDeepFiles, childDeepFolders) =
+              _scanDirectory(entity, node);
+          deepFiles += childDeepFiles;
+          deepFolders += childDeepFolders;
+        } else {
+          subFiles++;
+          deepFiles++;
         }
       }
     } catch (e) {
@@ -91,50 +102,12 @@ class FileSystemScanner {
         'hexDump': '',
       });
     }
-  }
 
-  void _calculateCounts(Node node) {
-    if (onProgress != null) {
-      _calculatedNodes++;
-      final isLastNode = _calculatedNodes == _nodeCounter;
-      if (_calculatedNodes % 1024 == 0 || isLastNode) {
-        final now = DateTime.now();
-        if (isLastNode ||
-            now.difference(_lastProgressTime).inMilliseconds >= 500) {
-          _lastProgressTime = now;
-          double calculateProgress =
-              _nodeCounter > 0 ? (_calculatedNodes / _nodeCounter) : 0.0;
-          onProgress!(
-            0.9 + (calculateProgress * 0.1),
-            'Calculating node statistics ($_calculatedNodes / $_nodeCounter nodes)...',
-          );
-        }
-      }
-    }
+    parentNode.subFileCount = subFiles;
+    parentNode.subFolderCount = subFolders;
+    parentNode.deepFileCount = deepFiles;
+    parentNode.deepFolderCount = deepFolders;
 
-    if (!node.isDir) return;
-
-    int subFiles = 0;
-    int subFolders = 0;
-    int deepFiles = 0;
-    int deepFolders = 0;
-
-    for (var child in node.children) {
-      if (child.isDir) {
-        subFolders++;
-        deepFolders++;
-        _calculateCounts(child);
-        deepFiles += child.deepFileCount;
-        deepFolders += child.deepFolderCount;
-      } else {
-        subFiles++;
-        deepFiles++;
-      }
-    }
-
-    node.subFileCount = subFiles;
-    node.subFolderCount = subFolders;
-    node.deepFileCount = deepFiles;
-    node.deepFolderCount = deepFolders;
+    return (deepFiles, deepFolders);
   }
 }
