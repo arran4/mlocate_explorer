@@ -1912,7 +1912,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                             const SizedBox(height: 16),
                             ElevatedButton(
                               onPressed: _scanFileSystem,
-                              child: const Text('Create from existing file system'),
+                              child: const Text(
+                                  'Create from existing file system'),
                             ),
                           ],
                         )

@@ -25,7 +25,11 @@ class FileSystemScanner {
       return;
     }
 
-    String label = rootPath == '/' ? '/' : rootPath.split('/').lastWhere((e) => e.isNotEmpty, orElse: () => rootPath);
+    String label = rootPath == '/'
+        ? '/'
+        : rootPath
+            .split('/')
+            .lastWhere((e) => e.isNotEmpty, orElse: () => rootPath);
 
     rootNode = Node(
       key: rootPath,
@@ -75,7 +79,7 @@ class FileSystemScanner {
         parentNode.children.add(node);
 
         if (isDir) {
-          _scanDirectory(entity as Directory, node);
+          _scanDirectory(entity, node);
         }
       }
     } catch (e) {
