@@ -13,6 +13,7 @@ import 'package:archive/archive.dart';
 import '../models/node.dart';
 import '../services/mlocate_db_parser.dart';
 import '../services/mlocate_db_writer.dart';
+import '../services/file_system_scanner.dart';
 
 import '../widgets/modify_node_dialog.dart';
 
@@ -52,6 +53,44 @@ void _parseIsolateEntry(Map<String, dynamic> args) {
     'rootNode': parser.rootNode,
     'errors': parser.errors,
   });
+}
+
+void _scanFileSystemIsolateEntry(Map<String, dynamic> args) {
+  SendPort sendPort = args['sendPort'];
+  String directoryPath = args['directoryPath'];
+
+  try {
+    var scanner = FileSystemScanner(
+      directoryPath,
+      onProgress: (progress, status) {
+        sendPort.send({
+          'type': 'progress',
+          'progress': progress,
+          'status': status,
+        });
+      },
+    );
+    scanner.scan();
+    sendPort.send({
+      'type': 'done',
+      'rootNode': scanner.rootNode,
+      'errors': scanner.errors,
+    });
+  } catch (e) {
+    sendPort.send({
+      'type': 'done',
+      'rootNode': null,
+      'errors': [
+        {
+          'description': 'Fatal error during scan: $e',
+          'directoryPath': directoryPath,
+          'offset': 0,
+          'percentage': 0.0,
+          'hexDump': '',
+        }
+      ],
+    });
+  }
 }
 
 enum GroupOption { dirsFirst, filesFirst, none }
@@ -219,6 +258,57 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       });
 
       _parseDatabase();
+    }
+  }
+
+  Future<void> _scanFileSystem() async {
+    String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
+    if (selectedDirectory != null) {
+      setState(() {
+        filePath = selectedDirectory;
+        _isLoading = true;
+        _loadingProgress = null;
+        _loadingStatus = 'Scanning file system...';
+      });
+
+      _receivePort = ReceivePort();
+      _isolate = await Isolate.spawn(_scanFileSystemIsolateEntry, {
+        'sendPort': _receivePort!.sendPort,
+        'directoryPath': selectedDirectory,
+      });
+
+      _receivePort!.listen((message) {
+        if (message is Map<String, dynamic>) {
+          if (message['type'] == 'progress') {
+            setState(() {
+              _loadingProgress = message['progress'] as double?;
+              _loadingStatus = message['status'] as String?;
+            });
+            return;
+          } else if (message['type'] == 'done') {
+            setState(() {
+              rootNode = message['rootNode'] as Node?;
+              _parseErrors = List<Map<String, dynamic>>.from(
+                message['errors'] ?? [],
+              );
+
+              if (rootNode != null) {
+                _navigationStack.clear();
+                _navigationStack.add(rootNode!);
+                _pathController.text = rootNode!.key;
+              }
+              _isLoading = false;
+              _searchQuery = '';
+              _searchController.text = '';
+            });
+            _receivePort?.close();
+            _receivePort = null;
+            _isolate?.kill(priority: Isolate.immediate);
+            _isolate = null;
+            return;
+          }
+        }
+      });
     }
   }
 
@@ -1834,6 +1924,12 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                             ElevatedButton(
                               onPressed: _openSystemDb,
                               child: const Text('Open System DB'),
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _scanFileSystem,
+                              child: const Text(
+                                  'Create from existing file system'),
                             ),
                           ],
                         )
