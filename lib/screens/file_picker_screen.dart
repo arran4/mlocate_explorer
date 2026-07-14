@@ -87,7 +87,7 @@ void _scanFileSystemIsolateEntry(Map<String, dynamic> args) {
           'offset': 0,
           'percentage': 0.0,
           'hexDump': '',
-        }
+        },
       ],
     });
   }
@@ -173,14 +173,15 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         }
 
         // Check for duplicates
-        final exists =
-            targetDir.children.any((child) => child.label == trimmedName);
+        final exists = targetDir.children.any(
+          (child) => child.label == trimmedName,
+        );
         if (exists) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                  content:
-                      Text('An item named "$trimmedName" already exists.')),
+                content: Text('An item named "$trimmedName" already exists.'),
+              ),
             );
           }
           return;
@@ -346,8 +347,10 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(errorMessage ??
-                'Could not find system database (/var/lib/mlocate/mlocate.db or plocate.db)'),
+            content: Text(
+              errorMessage ??
+                  'Could not find system database (/var/lib/mlocate/mlocate.db or plocate.db)',
+            ),
           ),
         );
       }
@@ -456,9 +459,9 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
         globPattern = Glob(trimmedQuery);
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Invalid Glob Pattern: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Invalid Glob Pattern: $e')));
           setState(() {
             _isLocating = false;
           });
@@ -790,7 +793,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
   Future<void> _exportWholeDb() async {
     if (rootNode == null) return;
 
-    final format = await _showExportFormatDialog(true);
+    final format = await _showExportFormatDialog();
     if (format == null) {
       return;
     }
@@ -818,9 +821,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
 
           if (mounted && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Exported database to $savePath'),
-              ),
+              SnackBar(content: Text('Exported database to $savePath')),
             );
           }
         } catch (e) {
@@ -870,9 +871,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
           await File(savePath).writeAsBytes(archiveData);
           if (mounted && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Exported database to $savePath'),
-              ),
+              SnackBar(content: Text('Exported database to $savePath')),
             );
           }
         } catch (e) {
@@ -924,7 +923,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
           _collectTreeAscii(rootNode!, buffer, "", true, true);
         } else {
           for (final child in rootNode!.children) {
-            _collectTree(child, buffer);
+            _collectTree(child, buffer, format, rootNode!.key);
           }
         }
         await File(savePath).writeAsString(buffer.toString());
@@ -937,7 +936,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     }
   }
 
-  Future<String?> _showExportFormatDialog(bool isTree) async {
+  Future<String?> _showExportFormatDialog() async {
     return showDialog<String>(
       context: context,
       builder: (BuildContext context) {
@@ -951,18 +950,16 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                 subtitle: const Text('A flat list of file paths'),
                 onTap: () => Navigator.of(context).pop('raw'),
               ),
-              if (!isTree)
-                ListTile(
-                  title: const Text('ls-like'),
-                  subtitle: const Text('A basic list of file names'),
-                  onTap: () => Navigator.of(context).pop('ls'),
-                ),
-              if (isTree)
-                ListTile(
-                  title: const Text('ASCII Tree'),
-                  subtitle: const Text('A visual tree representation'),
-                  onTap: () => Navigator.of(context).pop('ascii'),
-                ),
+              ListTile(
+                title: const Text('ls-like'),
+                subtitle: const Text('A basic list of file names'),
+                onTap: () => Navigator.of(context).pop('ls'),
+              ),
+              ListTile(
+                title: const Text('ASCII Tree'),
+                subtitle: const Text('A visual tree representation'),
+                onTap: () => Navigator.of(context).pop('ascii'),
+              ),
               ListTile(
                 title: const Text('JSON'),
                 subtitle: const Text('Structured JSON data'),
@@ -976,13 +973,15 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
               ListTile(
                 title: const Text('tar (empty files)'),
                 subtitle: const Text(
-                    'Tar archive preserving directory structure with empty files'),
+                  'Tar archive preserving directory structure with empty files',
+                ),
                 onTap: () => Navigator.of(context).pop('tar'),
               ),
               ListTile(
                 title: const Text('zip (empty files)'),
                 subtitle: const Text(
-                    'Zip archive preserving directory structure with empty files'),
+                  'Zip archive preserving directory structure with empty files',
+                ),
                 onTap: () => Navigator.of(context).pop('zip'),
               ),
             ],
@@ -992,165 +991,13 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     );
   }
 
-  Future<void> _exportDirectory(Node node) async {
-    final format = await _showExportFormatDialog(false);
-    if (format == null) {
-      return;
-    }
-
-    final ext = format == 'json'
-        ? 'json'
-        : format == 'mlocate'
-            ? 'db'
-            : format == 'tar'
-                ? 'tar'
-                : format == 'zip'
-                    ? 'zip'
-                    : 'txt';
-    final savePath = await FilePicker.platform.saveFile(
-      dialogTitle: 'Export Directory',
-      fileName: 'directory_export.$ext',
-    );
-
-    if (savePath != null) {
-      if (format == 'mlocate') {
-        final clonedNode = Node(
-          key: node.key,
-          label: node.label,
-          isDir: node.isDir,
-          modifiedTime: node.modifiedTime,
-          isOpened: node.isOpened,
-          subFileCount: node.subFileCount,
-          subFolderCount: node.subFolderCount,
-          deepFileCount: node.deepFileCount,
-          deepFolderCount: node.deepFolderCount,
-          mlocateIndex: node.mlocateIndex,
-          sizeOverride: node.sizeOverride,
-          children: node.children
-              .where((child) {
-                if (_showHiddenFiles) return true;
-                final label = child.label;
-                return !label.startsWith('.') || label == '.' || label == '..';
-              })
-              .map((child) => Node(
-                    key: child.key,
-                    label: child.label,
-                    isDir: child.isDir,
-                    modifiedTime: child.modifiedTime,
-                    isOpened: child.isOpened,
-                    subFileCount: child.subFileCount,
-                    subFolderCount: child.subFolderCount,
-                    deepFileCount: child.deepFileCount,
-                    deepFolderCount: child.deepFolderCount,
-                    mlocateIndex: child.mlocateIndex,
-                    sizeOverride: child.sizeOverride,
-                    children: const [], // shallow export
-                  ))
-              .toList(),
-        );
-
-        try {
-          await compute(_writeMlocateDb, [savePath, clonedNode]);
-        } catch (e) {
-          if (mounted && context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Failed to export directory: $e'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-          return;
-        }
-      } else if (format == 'tar' || format == 'zip') {
-        final archive = Archive();
-        final showHidden = _showHiddenFiles;
-        for (final child in node.children) {
-          if (!showHidden &&
-              child.label.startsWith('.') &&
-              child.label != '.' &&
-              child.label != '..') {
-            continue;
-          }
-          final path = child.label + (child.isDir ? '/' : '');
-          final file = ArchiveFile(path, 0, <int>[]);
-          if (child.modifiedTime != null) {
-            file.lastModTime =
-                child.modifiedTime!.millisecondsSinceEpoch ~/ 1000;
-          }
-          archive.addFile(file);
-        }
-
-        try {
-          final archiveData = await compute(_encodeArchive, [archive, format]);
-          if (archiveData == null) {
-            throw Exception('Encoder returned empty data');
-          }
-          await File(savePath).writeAsBytes(archiveData);
-        } catch (e) {
-          if (mounted && context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Failed to export directory: $e'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-          return;
-        }
-      } else if (format == 'json') {
-        Map<String, dynamic> toMapFlat(Node n) {
-          return {
-            'key': n.key,
-            'label': n.label,
-            'isDir': n.isDir,
-            'modifiedTime': n.modifiedTime?.toIso8601String(),
-            'isOpened': n.isOpened,
-            'subFileCount': n.subFileCount,
-            'subFolderCount': n.subFolderCount,
-            'deepFileCount': n.deepFileCount,
-            'deepFolderCount': n.deepFolderCount,
-            'children': const <Map<String, dynamic>>[],
-          };
-        }
-
-        final Map<String, dynamic> data = toMapFlat(node);
-        data['children'] = node.children
-            .where((child) {
-              if (_showHiddenFiles) return true;
-              final label = child.label;
-              return !label.startsWith('.') || label == '.' || label == '..';
-            })
-            .map(toMapFlat)
-            .toList();
-        await File(savePath).writeAsString(jsonEncode(data));
-      } else {
-        final buffer = StringBuffer();
-        for (final child in node.children) {
-          if (!_showHiddenFiles &&
-              child.label.startsWith('.') &&
-              child.label != '.' &&
-              child.label != '..') {
-            continue;
-          }
-          if (format == 'ls') {
-            buffer.writeln(child.label + (child.isDir ? '/' : ''));
-          } else {
-            buffer.writeln(child.key);
-          }
-        }
-        await File(savePath).writeAsString(buffer.toString());
-      }
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Exported to $savePath')));
-      }
-    }
-  }
-
   void _collectTreeAscii(
-      Node node, StringBuffer buffer, String prefix, bool isTail, bool isRoot) {
+    Node node,
+    StringBuffer buffer,
+    String prefix,
+    bool isTail,
+    bool isRoot,
+  ) {
     if (!_showHiddenFiles &&
         node.label.startsWith('.') &&
         node.label != '.' &&
@@ -1169,33 +1016,56 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     final validChildren = _showHiddenFiles
         ? node.children
         : node.children
-            .where((c) =>
-                !c.label.startsWith('.') || c.label == '.' || c.label == '..')
+            .where(
+              (c) =>
+                  !c.label.startsWith('.') || c.label == '.' || c.label == '..',
+            )
             .toList();
 
     for (var i = 0; i < validChildren.length; i++) {
       final child = validChildren[i];
       final isLast = i == validChildren.length - 1;
-      _collectTreeAscii(child, buffer,
-          isRoot ? prefix : prefix + (isTail ? '    ' : '│   '), isLast, false);
+      _collectTreeAscii(
+        child,
+        buffer,
+        isRoot ? prefix : prefix + (isTail ? '    ' : '│   '),
+        isLast,
+        false,
+      );
     }
   }
 
-  void _collectTree(Node node, StringBuffer buffer) {
+  void _collectTree(Node node, StringBuffer buffer, String format,
+      [String? basePath]) {
     if (!_showHiddenFiles &&
         node.label.startsWith('.') &&
         node.label != '.' &&
         node.label != '..') {
       return;
     }
-    buffer.writeln(node.key);
+
+    if (format == 'ls') {
+      String displayPath = node.key;
+      if (basePath != null && displayPath.startsWith(basePath)) {
+        displayPath = displayPath.substring(basePath.length);
+        if (displayPath.startsWith('/')) {
+          displayPath = displayPath.substring(1);
+        }
+      } else {
+        displayPath = node.label;
+      }
+      buffer.writeln(displayPath + (node.isDir ? '/' : ''));
+    } else {
+      buffer.writeln(node.key);
+    }
+
     for (final child in node.children) {
-      _collectTree(child, buffer);
+      _collectTree(child, buffer, format, basePath);
     }
   }
 
-  Future<void> _exportDirectoryTree(Node node) async {
-    final format = await _showExportFormatDialog(true);
+  Future<void> _exportDirectory(Node node) async {
+    final format = await _showExportFormatDialog();
     if (format == null) {
       return;
     }
@@ -1210,8 +1080,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                     ? 'zip'
                     : 'txt';
     final savePath = await FilePicker.platform.saveFile(
-      dialogTitle: 'Export Directory Tree',
-      fileName: 'directory_tree_export.$ext',
+      dialogTitle: 'Export Directory',
+      fileName: 'directory_export.$ext',
     );
 
     if (savePath != null) {
@@ -1249,7 +1119,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
           if (mounted && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Failed to export directory tree: $e'),
+                content: Text('Failed to export directory: $e'),
                 backgroundColor: Colors.red,
               ),
             );
@@ -1295,7 +1165,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
           if (mounted && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Failed to export directory tree: $e'),
+                content: Text('Failed to export directory: $e'),
                 backgroundColor: Colors.red,
               ),
             );
@@ -1336,7 +1206,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
           _collectTreeAscii(node, buffer, "", true, true);
         } else {
           for (final child in node.children) {
-            _collectTree(child, buffer);
+            _collectTree(child, buffer, format, node.key);
           }
         }
         await File(savePath).writeAsString(buffer.toString());
@@ -1344,7 +1214,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Exported tree to $savePath')));
+        ).showSnackBar(SnackBar(content: Text('Exported to $savePath')));
       }
     }
   }
@@ -1599,8 +1469,6 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                   _createNewNode(currentNode, true);
                 } else if (value == 'export_dir') {
                   _exportDirectory(currentNode);
-                } else if (value == 'export_tree') {
-                  _exportDirectoryTree(currentNode);
                 } else if (value == 'reload_db') {
                   _reloadDatabase();
                 } else if (value == 'close_db') {
@@ -1641,10 +1509,6 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                 const PopupMenuItem<String>(
                   value: 'export_dir',
                   child: Text('Export Directory'),
-                ),
-                const PopupMenuItem<String>(
-                  value: 'export_tree',
-                  child: Text('Export Directory Tree'),
                 ),
                 const PopupMenuDivider(),
                 const PopupMenuItem<String>(
@@ -1869,7 +1733,9 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                   TextButton(
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 0),
+                        horizontal: 8,
+                        vertical: 0,
+                      ),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
@@ -2085,11 +1951,6 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                               value: 'export_dir',
                                               child: Text('Export Directory'),
                                             ),
-                                            const PopupMenuItem<String>(
-                                              value: 'export_tree',
-                                              child:
-                                                  Text('Export Directory Tree'),
-                                            ),
                                           ],
                                         ],
                                       ).then((value) {
@@ -2126,9 +1987,11 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                                     int initialLen =
                                                         current.children.length;
                                                     current.children
-                                                        .removeWhere((n) =>
-                                                            n.key ==
-                                                            deletedNode.key);
+                                                        .removeWhere(
+                                                      (n) =>
+                                                          n.key ==
+                                                          deletedNode.key,
+                                                    );
                                                     if (current
                                                             .children.length <
                                                         initialLen) {
@@ -2158,15 +2021,14 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
                                           );
                                         } else if (value == 'export_dir') {
                                           _exportDirectory(listNode);
-                                        } else if (value == 'export_tree') {
-                                          _exportDirectoryTree(listNode);
                                         } else if (value == 'copy_path') {
                                           Clipboard.setData(
                                             ClipboardData(text: listNode.key),
                                           ).then((_) {
                                             if (mounted && context.mounted) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
                                                 const SnackBar(
                                                   content: Text(
                                                     'Copied path to clipboard',
@@ -2339,11 +2201,15 @@ class _NodeSubtitleState extends State<_NodeSubtitle> {
             style: const TextStyle(fontSize: 12),
           ),
         if (timeToDisplay != null)
-          Text('Modified: ${timeToDisplay.toLocal().toString()}',
-              style: const TextStyle(fontSize: 12)),
+          Text(
+            'Modified: ${timeToDisplay.toLocal().toString()}',
+            style: const TextStyle(fontSize: 12),
+          ),
         if (sizeToDisplay != null && !node.isDir)
-          Text('Size: ${_formatBytes(sizeToDisplay)}',
-              style: const TextStyle(fontSize: 12)),
+          Text(
+            'Size: ${_formatBytes(sizeToDisplay)}',
+            style: const TextStyle(fontSize: 12),
+          ),
       ],
     );
   }
