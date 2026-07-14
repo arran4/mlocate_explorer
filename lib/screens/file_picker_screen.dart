@@ -923,7 +923,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
           _collectTreeAscii(rootNode!, buffer, "", true, true);
         } else {
           for (final child in rootNode!.children) {
-            _collectTree(child, buffer, format);
+            _collectTree(child, buffer, format, rootNode!.key);
           }
         }
         await File(savePath).writeAsString(buffer.toString());
@@ -1035,7 +1035,8 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     }
   }
 
-  void _collectTree(Node node, StringBuffer buffer, String format) {
+  void _collectTree(Node node, StringBuffer buffer, String format,
+      [String? basePath]) {
     if (!_showHiddenFiles &&
         node.label.startsWith('.') &&
         node.label != '.' &&
@@ -1044,13 +1045,22 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
     }
 
     if (format == 'ls') {
-      buffer.writeln(node.label + (node.isDir ? '/' : ''));
+      String displayPath = node.key;
+      if (basePath != null && displayPath.startsWith(basePath)) {
+        displayPath = displayPath.substring(basePath.length);
+        if (displayPath.startsWith('/')) {
+          displayPath = displayPath.substring(1);
+        }
+      } else {
+        displayPath = node.label;
+      }
+      buffer.writeln(displayPath + (node.isDir ? '/' : ''));
     } else {
       buffer.writeln(node.key);
     }
 
     for (final child in node.children) {
-      _collectTree(child, buffer, format);
+      _collectTree(child, buffer, format, basePath);
     }
   }
 
@@ -1196,7 +1206,7 @@ class _FilePickerScreenState extends State<FilePickerScreen> {
           _collectTreeAscii(node, buffer, "", true, true);
         } else {
           for (final child in node.children) {
-            _collectTree(child, buffer, format);
+            _collectTree(child, buffer, format, node.key);
           }
         }
         await File(savePath).writeAsString(buffer.toString());
