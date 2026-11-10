@@ -47,3 +47,6 @@ hexdump100.txt
 /directory_*.txt
 /exported.db
 /directory_tree_export.zip
+
+# FVM local SDK; track .fvmrc
+.fvm/
